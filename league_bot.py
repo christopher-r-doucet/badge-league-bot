@@ -2,13 +2,12 @@ import os
 import sys
 import sqlite3
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 import logging
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 from discord import app_commands, Interaction, File
-from config import DATABASE_NAME
 import math
 
 # Constants for ELO calculation
