@@ -120,6 +120,30 @@ def setup_database():
     conn.commit()
     print("Database setup complete!")
 
+def handle_command_error(interaction: Interaction, error: Exception, command_name: str) -> str:
+    """
+    Handle command errors and return appropriate error messages
+    """
+    error_msg = f"Error in {command_name}: "
+    
+    if isinstance(error, app_commands.errors.CommandInvokeError):
+        error = error.original
+    
+    if isinstance(error, sqlite3.IntegrityError):
+        if "UNIQUE constraint failed" in str(error):
+            error_msg += "This record already exists."
+        else:
+            error_msg += "Database constraint violation."
+    elif isinstance(error, sqlite3.OperationalError):
+        error_msg += "Database operation failed. The database might be locked or corrupted."
+    elif isinstance(error, ValueError):
+        error_msg += str(error)
+    else:
+        error_msg += f"An unexpected error occurred: {str(error)}"
+    
+    logger.error(f"{error_msg}\nFull traceback:", exc_info=error)
+    return error_msg
+
 # Setup bot with required intents
 class LeagueBot(discord.Client):
     def __init__(self):
@@ -217,9 +241,10 @@ async def register(interaction: Interaction, player_name: str):
                       (interaction.user.id, player_name, BASE_ELO))
         conn.commit()
         await interaction.response.send_message(f"Successfully registered as {player_name}!")
+        
     except Exception as e:
-        print(f"Error in register command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "register")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="status", description="Check your current status")
 async def status(interaction: Interaction):
@@ -237,9 +262,10 @@ async def status(interaction: Interaction):
         wins, losses, elo_rating = result
         rank, rank_emoji = get_rank(elo_rating)
         await interaction.response.send_message(f"Your record: {wins} wins, {losses} losses, ELO: {elo_rating} ({rank} {rank_emoji})")
+        
     except Exception as e:
-        print(f"Error in status command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "status")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="matches", description="View your upcoming matches")
 async def matches(interaction: Interaction):
@@ -264,9 +290,10 @@ async def matches(interaction: Interaction):
             message += f"{match[0]} vs ? at {match[1]} - {match[2]}\n"
         
         await interaction.response.send_message(message)
+        
     except Exception as e:
-        print(f"Error in matches command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "matches")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="schedule", description="Schedule a match with another player")
 @app_commands.describe(
@@ -293,9 +320,10 @@ async def schedule(interaction: Interaction, opponent: discord.Member, time: str
                       (interaction.user.id, opponent_id[0], time))
         conn.commit()
         await interaction.response.send_message(f"Match scheduled with {opponent} at {time}")
+        
     except Exception as e:
-        print(f"Error in schedule command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "schedule")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="schedule_table", description="Display the league schedule in a table format")
 async def schedule_table(interaction: Interaction):
@@ -341,8 +369,8 @@ async def schedule_table(interaction: Interaction):
         await interaction.response.send_message(table)
         
     except Exception as e:
-        print(f"Error in schedule_table command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "schedule_table")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="report", description="Report the result of a match")
 @app_commands.describe(
@@ -457,8 +485,8 @@ async def report(interaction: Interaction, opponent: discord.Member, result: Lit
         await interaction.response.send_message(response)
         
     except Exception as e:
-        print(f"Error in report command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "report")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="standings", description="Display the league standings")
 async def standings(interaction: Interaction):
@@ -511,8 +539,8 @@ async def standings(interaction: Interaction):
         await interaction.response.send_message(table + rank_explanation, files=files)
         
     except Exception as e:
-        print(f"Error in standings command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "standings")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="echo", description="Echoes back your message")
 @app_commands.describe(message="The message to echo back")
@@ -520,15 +548,6 @@ async def echo(interaction: Interaction, message: str):
     print(f"Received echo command from {interaction.user}")
     await interaction.response.send_message(f"Echo: {message}")
 
-@bot.event
-async def on_command_error(ctx, error):
-    print(f"Command error: {error}")
-    if isinstance(error, app_commands.CommandNotFound):
-        await ctx.response.send_message("Command not found. Use /help for available commands.")
-    else:
-        await ctx.response.send_message(f"An error occurred: {str(error)}")
-
-# League management commands
 @command_decorator(name="create_league", description="Create a new league")
 @app_commands.describe(league_name="Name of the league to create")
 async def create_league(interaction: Interaction, league_name: str):
@@ -537,11 +556,12 @@ async def create_league(interaction: Interaction, league_name: str):
         cursor.execute('INSERT INTO leagues (league_name) VALUES (?)', (league_name,))
         conn.commit()
         await interaction.response.send_message(f"Successfully created league: {league_name}")
+        
     except sqlite3.IntegrityError:
         await interaction.response.send_message(f"A league with the name '{league_name}' already exists!")
     except Exception as e:
-        print(f"Error in create_league command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "create_league")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="join_league", description="Join a league")
 @app_commands.describe(league_name="Name of the league to join")
@@ -571,8 +591,8 @@ async def join_league(interaction: Interaction, league_name: str):
             await interaction.response.send_message(f"You are already in league '{league_name}'!")
             
     except Exception as e:
-        print(f"Error in join_league command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "join_league")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="list_leagues", description="List all available leagues")
 async def list_leagues(interaction: Interaction):
@@ -607,8 +627,8 @@ async def list_leagues(interaction: Interaction):
         await interaction.response.send_message(table)
         
     except Exception as e:
-        print(f"Error in list_leagues command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "list_leagues")
+        await interaction.response.send_message(error_msg)
 
 @command_decorator(name="league_standings", description="Show standings for a specific league")
 @app_commands.describe(league_name="Name of the league to show standings for")
@@ -658,8 +678,8 @@ async def league_standings(interaction: Interaction, league_name: str):
         await interaction.response.send_message(table + rank_explanation)
         
     except Exception as e:
-        print(f"Error in league_standings command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
+        error_msg = handle_command_error(interaction, e, "league_standings")
+        await interaction.response.send_message(error_msg)
 
 # Run the bot
 if __name__ == "__main__":
