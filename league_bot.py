@@ -140,24 +140,25 @@ bot = LeagueBot()
 
 def command_decorator(name: str, description: str, **kwargs):
     """
-    Custom decorator that creates both guild and global commands in dev mode,
-    but only global commands in production.
+    Custom decorator that creates either guild commands in dev mode,
+    or global commands in production.
     """
     def decorator(func):
         if DEV_MODE and TEST_GUILD_ID:
             # In dev mode, create guild command for instant updates
-            bot.tree.command(
+            return bot.tree.command(
                 name=name,
                 description=description,
                 guild=discord.Object(id=TEST_GUILD_ID),
                 **kwargs
             )(func)
-        # Always create global command
-        return bot.tree.command(
-            name=name,
-            description=description,
-            **kwargs
-        )(func)
+        else:
+            # In production, create global command
+            return bot.tree.command(
+                name=name,
+                description=description,
+                **kwargs
+            )(func)
     return decorator
 
 def calculate_elo_change(winner_elo: float, loser_elo: float) -> tuple[float, float]:
