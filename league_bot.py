@@ -94,17 +94,39 @@ def setup_database():
         )
     ''')
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS leagues (
+            league_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            league_name TEXT NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS league_players (
+            league_id INTEGER,
+            player_id INTEGER,
+            joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            league_elo REAL DEFAULT 1000.0,
+            league_wins INTEGER DEFAULT 0,
+            league_losses INTEGER DEFAULT 0,
+            PRIMARY KEY (league_id, player_id),
+            FOREIGN KEY (league_id) REFERENCES leagues(league_id),
+            FOREIGN KEY (player_id) REFERENCES players(discord_id)
+        )
+    ''')
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS matches (
             match_id INTEGER PRIMARY KEY AUTOINCREMENT,
             player1_id INTEGER,
             player2_id INTEGER,
             winner_id INTEGER,
+            league_id INTEGER,
             scheduled_time TEXT,
             status TEXT DEFAULT 'pending',
             elo_change REAL DEFAULT 0.0,
             FOREIGN KEY (player1_id) REFERENCES players(discord_id),
             FOREIGN KEY (player2_id) REFERENCES players(discord_id),
-            FOREIGN KEY (winner_id) REFERENCES players(discord_id)
+            FOREIGN KEY (winner_id) REFERENCES players(discord_id),
+            FOREIGN KEY (league_id) REFERENCES leagues(league_id)
         )
     ''')
     conn.commit()
@@ -241,68 +263,118 @@ async def matches(interaction: Interaction):
         print(f"Error in matches command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="report", description="Report match results")
-@app_commands.describe(opponent="The player you played against", result="Did you win? (yes/no)")
-async def report(interaction: Interaction, opponent: str, result: str):
+@bot.tree.command(name="report", description="Report the result of a match")
+@app_commands.describe(
+    opponent="The opponent you played against",
+    result="Did you win or lose?",
+    league_name="The league this match belongs to (optional)"
+)
+async def report(interaction: Interaction, opponent: discord.Member, result: Literal["win", "loss"], league_name: str = None):
     try:
         print(f"Received report command from {interaction.user}")
-        if result.lower() not in ['yes', 'no']:
-            await interaction.response.send_message("Result must be 'yes' or 'no'")
+        player_id = interaction.user.id
+        opponent_id = opponent.id
+        
+        # Verify both players are registered
+        cursor.execute('SELECT * FROM players WHERE discord_id IN (?, ?)', (player_id, opponent_id))
+        if len(cursor.fetchall()) != 2:
+            await interaction.response.send_message("Both players must be registered first!")
             return
-        
-        cursor.execute('SELECT discord_id FROM players WHERE player_name = ?', (opponent,))
-        opponent_id = cursor.fetchone()
-        
-        if not opponent_id:
-            await interaction.response.send_message(f"Player {opponent} is not registered!")
-            return
-        
+
+        # If league is specified, verify it exists and both players are in it
+        league_id = None
+        if league_name:
+            cursor.execute('SELECT league_id FROM leagues WHERE league_name = ?', (league_name,))
+            league = cursor.fetchone()
+            if not league:
+                await interaction.response.send_message(f"League '{league_name}' not found!")
+                return
+            league_id = league[0]
+            
+            # Check if both players are in the league
+            cursor.execute('''
+                SELECT COUNT(*) FROM league_players 
+                WHERE league_id = ? AND player_id IN (?, ?)
+            ''', (league_id, player_id, opponent_id))
+            if cursor.fetchone()[0] != 2:
+                await interaction.response.send_message("Both players must be members of the specified league!")
+                return
+
+        # Get current ratings
+        cursor.execute('SELECT elo_rating FROM players WHERE discord_id = ?', (player_id,))
+        player_rating = cursor.fetchone()[0]
+        cursor.execute('SELECT elo_rating FROM players WHERE discord_id = ?', (opponent_id,))
+        opponent_rating = cursor.fetchone()[0]
+
+        # Calculate new ratings
+        winner_id = player_id if result == "win" else opponent_id
+        loser_id = opponent_id if result == "win" else player_id
+        elo_change = calculate_elo_change(
+            winner_rating=player_rating if result == "win" else opponent_rating,
+            loser_rating=opponent_rating if result == "win" else player_rating
+        )
+
+        # Update global ratings and record match
+        if result == "win":
+            cursor.execute('UPDATE players SET wins = wins + 1, elo_rating = elo_rating + ? WHERE discord_id = ?', (elo_change, player_id))
+            cursor.execute('UPDATE players SET losses = losses + 1, elo_rating = elo_rating - ? WHERE discord_id = ?', (elo_change, opponent_id))
+        else:
+            cursor.execute('UPDATE players SET losses = losses + 1, elo_rating = elo_rating - ? WHERE discord_id = ?', (elo_change, player_id))
+            cursor.execute('UPDATE players SET wins = wins + 1, elo_rating = elo_rating + ? WHERE discord_id = ?', (elo_change, opponent_id))
+
+        # Record the match
         cursor.execute('''
-            UPDATE matches
-            SET status = 'completed', winner_id = ?
-            WHERE player1_id = ? AND player2_id = ? AND status = 'pending'
-            ORDER BY match_id DESC
-            LIMIT 1
-        ''', (interaction.user.id if result.lower() == 'yes' else opponent_id[0],
-              interaction.user.id, opponent_id[0]))
-        
-        if cursor.rowcount == 0:
-            await interaction.response.send_message("No pending match found with this opponent")
-            return
-        
-        # Get ELO ratings
-        cursor.execute('SELECT elo_rating FROM players WHERE discord_id = ?', (interaction.user.id,))
-        user_elo = cursor.fetchone()[0]
-        cursor.execute('SELECT elo_rating FROM players WHERE discord_id = ?', (opponent_id[0],))
-        opponent_elo = cursor.fetchone()[0]
-        
-        # Calculate ELO changes
-        winner_elo = user_elo if result.lower() == 'yes' else opponent_elo
-        loser_elo = opponent_elo if result.lower() == 'yes' else user_elo
-        winner_change, loser_change = calculate_elo_change(winner_elo, loser_elo)
-        
-        # Update ELO ratings
-        cursor.execute('UPDATE players SET elo_rating = elo_rating + ? WHERE discord_id = ?', (winner_change, interaction.user.id if result.lower() == 'yes' else opponent_id[0]))
-        cursor.execute('UPDATE players SET elo_rating = elo_rating + ? WHERE discord_id = ?', (loser_change, interaction.user.id if result.lower() == 'no' else opponent_id[0]))
-        
-        # Update player stats
-        cursor.execute('''
-            UPDATE players
-            SET wins = wins + 1
-            WHERE discord_id = ?
-        ''', (interaction.user.id if result.lower() == 'yes' else opponent_id[0],))
-        
-        cursor.execute('''
-            UPDATE players
-            SET losses = losses + 1
-            WHERE discord_id = ?
-        ''', (interaction.user.id if result.lower() == 'no' else opponent_id[0],))
-        
-        # Update match ELO change
-        cursor.execute('UPDATE matches SET elo_change = ? WHERE match_id = (SELECT match_id FROM matches WHERE player1_id = ? AND player2_id = ? AND status = ? ORDER BY match_id DESC LIMIT 1)', (winner_change, interaction.user.id, opponent_id[0], 'completed'))
-        
+            INSERT INTO matches (player1_id, player2_id, winner_id, league_id, status, elo_change)
+            VALUES (?, ?, ?, ?, 'completed', ?)
+        ''', (player_id, opponent_id, winner_id, league_id, elo_change))
+
+        # If this is a league match, update league-specific stats
+        if league_id:
+            if result == "win":
+                cursor.execute('''
+                    UPDATE league_players 
+                    SET league_wins = league_wins + 1, 
+                        league_elo = league_elo + ? 
+                    WHERE league_id = ? AND player_id = ?
+                ''', (elo_change, league_id, player_id))
+                cursor.execute('''
+                    UPDATE league_players 
+                    SET league_losses = league_losses + 1, 
+                        league_elo = league_elo - ? 
+                    WHERE league_id = ? AND player_id = ?
+                ''', (elo_change, league_id, opponent_id))
+            else:
+                cursor.execute('''
+                    UPDATE league_players 
+                    SET league_losses = league_losses + 1, 
+                        league_elo = league_elo - ? 
+                    WHERE league_id = ? AND player_id = ?
+                ''', (elo_change, league_id, player_id))
+                cursor.execute('''
+                    UPDATE league_players 
+                    SET league_wins = league_wins + 1, 
+                        league_elo = league_elo + ? 
+                    WHERE league_id = ? AND player_id = ?
+                ''', (elo_change, league_id, opponent_id))
+
         conn.commit()
-        await interaction.response.send_message("Match results reported successfully!")
+
+        # Prepare response message
+        response = f"Match result recorded! ELO change: {elo_change:.1f}\n"
+        if league_name:
+            response += f"League: {league_name}\n"
+        
+        # Get updated ratings
+        cursor.execute('SELECT player_name, elo_rating FROM players WHERE discord_id = ?', (player_id,))
+        player = cursor.fetchone()
+        cursor.execute('SELECT player_name, elo_rating FROM players WHERE discord_id = ?', (opponent_id,))
+        opponent = cursor.fetchone()
+        
+        response += f"{player[0]}: {player[1]:.1f} ({'+' if result == 'win' else '-'}{elo_change:.1f})\n"
+        response += f"{opponent[0]}: {opponent[1]:.1f} ({'-' if result == 'win' else '+'}{elo_change:.1f})"
+        
+        await interaction.response.send_message(response)
+        
     except Exception as e:
         print(f"Error in report command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
@@ -418,6 +490,139 @@ async def echo(interaction: Interaction, message: str):
 async def test(ctx):
     print(f"Received test command from {ctx.author}")
     await ctx.send("Bot is alive!")
+
+# League management commands
+@bot.tree.command(name="create_league", description="Create a new league")
+@app_commands.describe(league_name="Name of the league to create")
+async def create_league(interaction: Interaction, league_name: str):
+    try:
+        print(f"Received create_league command from {interaction.user}")
+        cursor.execute('INSERT INTO leagues (league_name) VALUES (?)', (league_name,))
+        conn.commit()
+        await interaction.response.send_message(f"Successfully created league: {league_name}")
+    except sqlite3.IntegrityError:
+        await interaction.response.send_message(f"A league with the name '{league_name}' already exists!")
+    except Exception as e:
+        print(f"Error in create_league command: {e}")
+        await interaction.response.send_message(f"Error: {str(e)}")
+
+@bot.tree.command(name="join_league", description="Join a league")
+@app_commands.describe(league_name="Name of the league to join")
+async def join_league(interaction: Interaction, league_name: str):
+    try:
+        print(f"Received join_league command from {interaction.user}")
+        # Check if player is registered
+        cursor.execute('SELECT * FROM players WHERE discord_id = ?', (interaction.user.id,))
+        if not cursor.fetchone():
+            await interaction.response.send_message("You need to register first using /register!")
+            return
+            
+        # Get league ID
+        cursor.execute('SELECT league_id FROM leagues WHERE league_name = ?', (league_name,))
+        league = cursor.fetchone()
+        if not league:
+            await interaction.response.send_message(f"League '{league_name}' not found!")
+            return
+            
+        # Add player to league
+        try:
+            cursor.execute('INSERT INTO league_players (league_id, player_id) VALUES (?, ?)',
+                         (league[0], interaction.user.id))
+            conn.commit()
+            await interaction.response.send_message(f"Successfully joined league: {league_name}")
+        except sqlite3.IntegrityError:
+            await interaction.response.send_message(f"You are already in league '{league_name}'!")
+            
+    except Exception as e:
+        print(f"Error in join_league command: {e}")
+        await interaction.response.send_message(f"Error: {str(e)}")
+
+@bot.tree.command(name="list_leagues", description="List all available leagues")
+async def list_leagues(interaction: Interaction):
+    try:
+        print(f"Received list_leagues command from {interaction.user}")
+        cursor.execute('''
+            SELECT 
+                l.league_name,
+                COUNT(lp.player_id) as player_count
+            FROM leagues l
+            LEFT JOIN league_players lp ON l.league_id = lp.league_id
+            GROUP BY l.league_id, l.league_name
+            ORDER BY l.league_name
+        ''')
+        leagues = cursor.fetchall()
+        
+        if not leagues:
+            await interaction.response.send_message("No leagues exist yet!")
+            return
+            
+        # Create table
+        table = "```\nAvailable Leagues\n"
+        table += "=" * 40 + "\n"
+        table += f"{'League Name':<25} {'Players':<8}\n"
+        table += "-" * 40 + "\n"
+        
+        for league in leagues:
+            name, count = league
+            table += f"{name:<25} {count:<8}\n"
+        
+        table += "```"
+        await interaction.response.send_message(table)
+        
+    except Exception as e:
+        print(f"Error in list_leagues command: {e}")
+        await interaction.response.send_message(f"Error: {str(e)}")
+
+@bot.tree.command(name="league_standings", description="Show standings for a specific league")
+@app_commands.describe(league_name="Name of the league to show standings for")
+async def league_standings(interaction: Interaction, league_name: str):
+    try:
+        print(f"Received league_standings command from {interaction.user}")
+        cursor.execute('''
+            SELECT 
+                p.player_name,
+                lp.league_wins,
+                lp.league_losses,
+                lp.league_elo
+            FROM league_players lp
+            JOIN players p ON lp.player_id = p.discord_id
+            JOIN leagues l ON lp.league_id = l.league_id
+            WHERE l.league_name = ?
+            ORDER BY lp.league_elo DESC
+        ''', (league_name,))
+        players = cursor.fetchall()
+        
+        if not players:
+            await interaction.response.send_message(f"No players found in league '{league_name}'!")
+            return
+            
+        # Create table
+        table = f"```\n{league_name} Standings\n"
+        table += "=" * 65 + "\n"
+        table += f"{'Rank':<6} {'Player':<15} {'W':<5} {'L':<5} {'Win%':<8} {'ELO':<8} {'Tier':<10}\n"
+        table += "-" * 65 + "\n"
+        
+        # Add each player to the table
+        for i, player in enumerate(players, 1):
+            name, wins, losses, elo = player
+            win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0
+            rank, _ = get_rank(elo)
+            
+            table += f"{i:<6} {name:<15} {wins:<5} {losses:<5} {win_rate:>6.1f}% {elo:>7.0f} {rank}\n"
+        
+        table += "```"
+        
+        # Add rank explanation
+        rank_explanation = "\nRank Tiers:\n"
+        for rank, (min_elo, max_elo) in RANKS.items():
+            emoji = RANK_EMOJIS[rank]
+            rank_explanation += f"{emoji} {rank}: {min_elo}-{max_elo} ELO\n"
+        
+        await interaction.response.send_message(table + rank_explanation)
+        
+    except Exception as e:
+        print(f"Error in league_standings command: {e}")
+        await interaction.response.send_message(f"Error: {str(e)}")
 
 # Run the bot
 if __name__ == "__main__":
