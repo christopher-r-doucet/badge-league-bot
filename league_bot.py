@@ -49,6 +49,31 @@ RANK_EMOJIS = {
     "Grandmaster": "🏆"
 }
 
+DEV_MODE = os.getenv('DEV_MODE', 'false').lower() == 'true'
+TEST_GUILD_ID = int(os.getenv('TEST_GUILD_ID', '0'))  # Your test server's guild ID
+
+def command_decorator(name: str, description: str, **kwargs):
+    """
+    Custom decorator that creates both guild and global commands in dev mode,
+    but only global commands in production.
+    """
+    def decorator(func):
+        if DEV_MODE and TEST_GUILD_ID:
+            # In dev mode, create guild command for instant updates
+            bot.tree.command(
+                name=name,
+                description=description,
+                guild=discord.Object(id=TEST_GUILD_ID),
+                **kwargs
+            )(func)
+        # Always create global command
+        return bot.tree.command(
+            name=name,
+            description=description,
+            **kwargs
+        )(func)
+    return decorator
+
 def calculate_elo_change(winner_elo: float, loser_elo: float) -> tuple[float, float]:
     """Calculate ELO changes after a match."""
     expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
@@ -147,11 +172,16 @@ async def on_ready():
     print(f'Logged in as {bot.user.name} ({bot.user.id})')
     setup_database()
     try:
-        print("Syncing commands globally...")
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} command(s)")
-        for command in synced:
-            print(f"- Synced command: {command.name}")
+        if DEV_MODE and TEST_GUILD_ID:
+            print(f"Dev mode: Syncing commands to test guild {TEST_GUILD_ID}")
+            guild = discord.Object(id=TEST_GUILD_ID)
+            bot.tree.copy_global_to(guild=guild)
+            await bot.tree.sync(guild=guild)
+            print("Guild command sync complete")
+        
+        print("Syncing global commands...")
+        await bot.tree.sync()
+        print("Global command sync complete")
     except Exception as e:
         print(f"Error syncing commands: {e}")
 
@@ -242,7 +272,8 @@ async def matches(interaction: Interaction):
     try:
         print(f"Received matches command from {interaction.user}")
         cursor.execute('''
-            SELECT players.player_name, matches.scheduled_time, matches.status
+            SELECT 
+                players.player_name, matches.scheduled_time, matches.status
             FROM matches
             JOIN players ON players.discord_id = matches.player1_id
             WHERE matches.status = 'pending'
@@ -492,7 +523,7 @@ async def test(ctx):
     await ctx.send("Bot is alive!")
 
 # League management commands
-@bot.tree.command(name="create_league", description="Create a new league")
+@command_decorator(name="create_league", description="Create a new league")
 @app_commands.describe(league_name="Name of the league to create")
 async def create_league(interaction: Interaction, league_name: str):
     try:
@@ -506,7 +537,7 @@ async def create_league(interaction: Interaction, league_name: str):
         print(f"Error in create_league command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="join_league", description="Join a league")
+@command_decorator(name="join_league", description="Join a league")
 @app_commands.describe(league_name="Name of the league to join")
 async def join_league(interaction: Interaction, league_name: str):
     try:
@@ -537,7 +568,7 @@ async def join_league(interaction: Interaction, league_name: str):
         print(f"Error in join_league command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="list_leagues", description="List all available leagues")
+@command_decorator(name="list_leagues", description="List all available leagues")
 async def list_leagues(interaction: Interaction):
     try:
         print(f"Received list_leagues command from {interaction.user}")
@@ -573,7 +604,7 @@ async def list_leagues(interaction: Interaction):
         print(f"Error in list_leagues command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="league_standings", description="Show standings for a specific league")
+@command_decorator(name="league_standings", description="Show standings for a specific league")
 @app_commands.describe(league_name="Name of the league to show standings for")
 async def league_standings(interaction: Interaction, league_name: str):
     try:
