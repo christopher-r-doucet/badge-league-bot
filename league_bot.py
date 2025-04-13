@@ -201,8 +201,8 @@ async def on_command_error(ctx, error):
     else:
         await ctx.send(f"An error occurred: {str(error)}")
 
-@bot.tree.command(name="register", description="Register as a player in the league")
-@app_commands.describe(player_name="Your in-game name")
+@command_decorator(name="register", description="Register as a player")
+@app_commands.describe(player_name="Your player name")
 async def register(interaction: Interaction, player_name: str):
     try:
         print(f"Received register command from {interaction.user}")
@@ -221,33 +221,7 @@ async def register(interaction: Interaction, player_name: str):
         print(f"Error in register command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="schedule", description="Schedule a match with another player")
-@app_commands.describe(opponent="The player you want to challenge", time="Time for the match (YYYY-MM-DD HH:MM)")
-async def schedule(interaction: Interaction, opponent: str, time: str):
-    try:
-        print(f"Received schedule command from {interaction.user}")
-        cursor.execute('SELECT discord_id FROM players WHERE player_name = ?', (opponent,))
-        opponent_id = cursor.fetchone()
-        
-        if not opponent_id:
-            await interaction.response.send_message(f"Player {opponent} is not registered!")
-            return
-        
-        try:
-            datetime.strptime(time, '%Y-%m-%d %H:%M')
-        except ValueError:
-            await interaction.response.send_message("Invalid time format! Use YYYY-MM-DD HH:MM")
-            return
-        
-        cursor.execute('INSERT INTO matches (player1_id, player2_id, scheduled_time) VALUES (?, ?, ?)',
-                      (interaction.user.id, opponent_id[0], time))
-        conn.commit()
-        await interaction.response.send_message(f"Match scheduled with {opponent} at {time}")
-    except Exception as e:
-        print(f"Error in schedule command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
-
-@bot.tree.command(name="status", description="View your current standings")
+@command_decorator(name="status", description="Check your current status")
 async def status(interaction: Interaction):
     try:
         print(f"Received status command from {interaction.user}")
@@ -267,7 +241,7 @@ async def status(interaction: Interaction):
         print(f"Error in status command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="matches", description="View upcoming matches")
+@command_decorator(name="matches", description="View your upcoming matches")
 async def matches(interaction: Interaction):
     try:
         print(f"Received matches command from {interaction.user}")
@@ -294,7 +268,83 @@ async def matches(interaction: Interaction):
         print(f"Error in matches command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="report", description="Report the result of a match")
+@command_decorator(name="schedule", description="Schedule a match with another player")
+@app_commands.describe(
+    opponent="The player to schedule with",
+    time="When to play (format: YYYY-MM-DD HH:MM, e.g., 2024-01-01 15:30)"
+)
+async def schedule(interaction: Interaction, opponent: discord.Member, time: str):
+    try:
+        print(f"Received schedule command from {interaction.user}")
+        cursor.execute('SELECT discord_id FROM players WHERE player_name = ?', (opponent,))
+        opponent_id = cursor.fetchone()
+        
+        if not opponent_id:
+            await interaction.response.send_message(f"Player {opponent} is not registered!")
+            return
+        
+        try:
+            datetime.strptime(time, '%Y-%m-%d %H:%M')
+        except ValueError:
+            await interaction.response.send_message("Invalid time format! Use YYYY-MM-DD HH:MM")
+            return
+        
+        cursor.execute('INSERT INTO matches (player1_id, player2_id, scheduled_time) VALUES (?, ?, ?)',
+                      (interaction.user.id, opponent_id[0], time))
+        conn.commit()
+        await interaction.response.send_message(f"Match scheduled with {opponent} at {time}")
+    except Exception as e:
+        print(f"Error in schedule command: {e}")
+        await interaction.response.send_message(f"Error: {str(e)}")
+
+@command_decorator(name="schedule_table", description="Display the league schedule in a table format")
+async def schedule_table(interaction: Interaction):
+    try:
+        print(f"Received schedule_table command from {interaction.user}")
+        cursor.execute('''
+            SELECT 
+                p1.player_name as player1,
+                p2.player_name as player2,
+                m.scheduled_time,
+                m.status
+            FROM matches m
+            JOIN players p1 ON m.player1_id = p1.discord_id
+            JOIN players p2 ON m.player2_id = p2.discord_id
+            ORDER BY 
+                CASE m.status
+                    WHEN 'pending' THEN 1
+                    WHEN 'completed' THEN 2
+                    ELSE 3
+                END,
+                m.scheduled_time
+        ''')
+        matches = cursor.fetchall()
+        
+        if not matches:
+            await interaction.response.send_message("No matches scheduled yet!")
+            return
+            
+        # Create table header
+        table = "```\n"
+        table += "League Schedule\n"
+        table += "=" * 50 + "\n"
+        table += f"{'Player 1':<15} {'Player 2':<15} {'Time':<15} {'Status':<10}\n"
+        table += "-" * 50 + "\n"
+        
+        # Add each match to the table
+        for match in matches:
+            player1, player2, time, status = match
+            table += f"{player1:<15} {player2:<15} {time:<15} {status:<10}\n"
+        
+        table += "```"
+        
+        await interaction.response.send_message(table)
+        
+    except Exception as e:
+        print(f"Error in schedule_table command: {e}")
+        await interaction.response.send_message(f"Error: {str(e)}")
+
+@command_decorator(name="report", description="Report the result of a match")
 @app_commands.describe(
     opponent="The opponent you played against",
     result="Did you win or lose?",
@@ -410,54 +460,7 @@ async def report(interaction: Interaction, opponent: discord.Member, result: Lit
         print(f"Error in report command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="schedule_table", description="Display the league schedule in a table format")
-async def schedule_table(interaction: Interaction):
-    try:
-        print(f"Received schedule_table command from {interaction.user}")
-        cursor.execute('''
-            SELECT 
-                p1.player_name as player1,
-                p2.player_name as player2,
-                m.scheduled_time,
-                m.status
-            FROM matches m
-            JOIN players p1 ON m.player1_id = p1.discord_id
-            JOIN players p2 ON m.player2_id = p2.discord_id
-            ORDER BY 
-                CASE m.status
-                    WHEN 'pending' THEN 1
-                    WHEN 'completed' THEN 2
-                    ELSE 3
-                END,
-                m.scheduled_time
-        ''')
-        matches = cursor.fetchall()
-        
-        if not matches:
-            await interaction.response.send_message("No matches scheduled yet!")
-            return
-            
-        # Create table header
-        table = "```\n"
-        table += "League Schedule\n"
-        table += "=" * 50 + "\n"
-        table += f"{'Player 1':<15} {'Player 2':<15} {'Time':<15} {'Status':<10}\n"
-        table += "-" * 50 + "\n"
-        
-        # Add each match to the table
-        for match in matches:
-            player1, player2, time, status = match
-            table += f"{player1:<15} {player2:<15} {time:<15} {status:<10}\n"
-        
-        table += "```"
-        
-        await interaction.response.send_message(table)
-        
-    except Exception as e:
-        print(f"Error in schedule_table command: {e}")
-        await interaction.response.send_message(f"Error: {str(e)}")
-
-@bot.tree.command(name="standings", description="Display the league standings")
+@command_decorator(name="standings", description="Display the league standings")
 async def standings(interaction: Interaction):
     try:
         print(f"Received standings command from {interaction.user}")
@@ -511,7 +514,7 @@ async def standings(interaction: Interaction):
         print(f"Error in standings command: {e}")
         await interaction.response.send_message(f"Error: {str(e)}")
 
-@bot.tree.command(name="echo", description="Echoes back your message")
+@command_decorator(name="echo", description="Echoes back your message")
 @app_commands.describe(message="The message to echo back")
 async def echo(interaction: Interaction, message: str):
     print(f"Received echo command from {interaction.user}")
