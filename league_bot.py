@@ -62,45 +62,6 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-def command_decorator(name: str, description: str, **kwargs):
-    """
-    Custom decorator that creates both guild and global commands in dev mode,
-    but only global commands in production.
-    """
-    def decorator(func):
-        if DEV_MODE and TEST_GUILD_ID:
-            # In dev mode, create guild command for instant updates
-            bot.tree.command(
-                name=name,
-                description=description,
-                guild=discord.Object(id=TEST_GUILD_ID),
-                **kwargs
-            )(func)
-        # Always create global command
-        return bot.tree.command(
-            name=name,
-            description=description,
-            **kwargs
-        )(func)
-    return decorator
-
-def calculate_elo_change(winner_elo: float, loser_elo: float) -> tuple[float, float]:
-    """Calculate ELO changes after a match."""
-    expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
-    expected_loser = 1 - expected_winner
-    
-    winner_change = K_FACTOR * (1 - expected_winner)
-    loser_change = K_FACTOR * (0 - expected_loser)
-    
-    return winner_change, loser_change
-
-def get_rank(elo: float) -> tuple[str, str]:
-    """Get rank name and emoji based on ELO."""
-    for rank, (min_elo, max_elo) in RANKS.items():
-        if min_elo <= elo <= max_elo:
-            return rank, RANK_EMOJIS[rank]
-    return "Unranked", ""
-
 print("Current working directory:", os.getcwd())
 print("Loading environment variables...")
 load_dotenv(verbose=True)
@@ -157,35 +118,71 @@ def setup_database():
         )
     ''')
     conn.commit()
-    print("Database setup complete")
+    print("Database setup complete!")
 
 # Setup bot with required intents
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-intents.guilds = True
-intents.messages = True
-intents.reactions = True
-intents.presences = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+class LeagueBot(discord.Client):
+    def __init__(self):
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.members = True
+        super().__init__(intents=intents)
+        self.tree = app_commands.CommandTree(self)
+        
+    async def setup_hook(self):
+        if DEV_MODE and TEST_GUILD_ID:
+            guild = discord.Object(id=TEST_GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+        await self.tree.sync()
+
+bot = LeagueBot()
+
+def command_decorator(name: str, description: str, **kwargs):
+    """
+    Custom decorator that creates both guild and global commands in dev mode,
+    but only global commands in production.
+    """
+    def decorator(func):
+        if DEV_MODE and TEST_GUILD_ID:
+            # In dev mode, create guild command for instant updates
+            bot.tree.command(
+                name=name,
+                description=description,
+                guild=discord.Object(id=TEST_GUILD_ID),
+                **kwargs
+            )(func)
+        # Always create global command
+        return bot.tree.command(
+            name=name,
+            description=description,
+            **kwargs
+        )(func)
+    return decorator
+
+def calculate_elo_change(winner_elo: float, loser_elo: float) -> tuple[float, float]:
+    """Calculate ELO changes after a match."""
+    expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
+    expected_loser = 1 - expected_winner
+    
+    winner_change = K_FACTOR * (1 - expected_winner)
+    loser_change = K_FACTOR * (0 - expected_loser)
+    
+    return winner_change, loser_change
+
+def get_rank(elo: float) -> tuple[str, str]:
+    """Get rank name and emoji based on ELO."""
+    for rank, (min_elo, max_elo) in RANKS.items():
+        if min_elo <= elo <= max_elo:
+            return rank, RANK_EMOJIS[rank]
+    return "Unranked", ""
 
 @bot.event
 async def on_ready():
-    print(f'Logged in as {bot.user.name} ({bot.user.id})')
+    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    print("------")
     setup_database()
-    try:
-        if DEV_MODE and TEST_GUILD_ID:
-            print(f"Dev mode: Syncing commands to test guild {TEST_GUILD_ID}")
-            guild = discord.Object(id=TEST_GUILD_ID)
-            bot.tree.copy_global_to(guild=guild)
-            await bot.tree.sync(guild=guild)
-            print("Guild command sync complete")
-        
-        print("Syncing global commands...")
-        await bot.tree.sync()
-        print("Global command sync complete")
-    except Exception as e:
-        print(f"Error syncing commands: {e}")
+    print("Bot is ready!")
 
 @bot.event
 async def on_message(message):
@@ -198,10 +195,10 @@ async def on_message(message):
 @bot.event
 async def on_command_error(ctx, error):
     print(f"Command error: {error}")
-    if isinstance(error, commands.CommandNotFound):
-        await ctx.send("Command not found. Use !help for available commands.")
+    if isinstance(error, app_commands.CommandNotFound):
+        await ctx.response.send_message("Command not found. Use /help for available commands.")
     else:
-        await ctx.send(f"An error occurred: {str(error)}")
+        await ctx.response.send_message(f"An error occurred: {str(error)}")
 
 @command_decorator(name="register", description="Register as a player")
 @app_commands.describe(player_name="Your player name")
@@ -522,10 +519,13 @@ async def echo(interaction: Interaction, message: str):
     print(f"Received echo command from {interaction.user}")
     await interaction.response.send_message(f"Echo: {message}")
 
-@bot.command(name="test")
-async def test(ctx):
-    print(f"Received test command from {ctx.author}")
-    await ctx.send("Bot is alive!")
+@bot.event
+async def on_command_error(ctx, error):
+    print(f"Command error: {error}")
+    if isinstance(error, app_commands.CommandNotFound):
+        await ctx.response.send_message("Command not found. Use /help for available commands.")
+    else:
+        await ctx.response.send_message(f"An error occurred: {str(error)}")
 
 # League management commands
 @command_decorator(name="create_league", description="Create a new league")
