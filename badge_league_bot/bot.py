@@ -20,11 +20,23 @@ class LeagueBot(discord.Client):
         self.tree = app_commands.CommandTree(self)
         
     async def setup_hook(self):
+        """This is called when the bot starts, sets up the command tree"""
+        logger.info("Setting up command tree...")
         if DEV_MODE and TEST_GUILD_ID:
+            logger.info(f"Development mode: Syncing commands to test guild {TEST_GUILD_ID}")
             guild = discord.Object(id=TEST_GUILD_ID)
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
-        await self.tree.sync()
+            logger.info("Guild command sync complete!")
+        else:
+            logger.info("Production mode: Syncing global commands")
+            await self.tree.sync()
+            logger.info("Global command sync complete!")
+
+    async def on_ready(self):
+        """Called when the bot is ready to start receiving events"""
+        logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
+        logger.info("------")
 
 def command_decorator(name: str, description: str, **kwargs):
     """
