@@ -123,25 +123,15 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user.name} ({bot.user.id})')
-    print(f'Bot is in {len(bot.guilds)} guilds:')
-    for guild in bot.guilds:
-        print(f'- {guild.name} ({guild.id})')
-        try:
-            print(f"Syncing commands to guild: {guild.name}")
-            await bot.tree.sync(guild=guild)
-            print(f"Successfully synced commands to {guild.name}")
-        except Exception as e:
-            print(f"Failed to sync commands to {guild.name}: {e}")
-    
     setup_database()
     try:
-        print("Syncing global commands...")
+        print("Syncing commands globally...")
         synced = await bot.tree.sync()
         print(f"Synced {len(synced)} command(s)")
         for command in synced:
             print(f"- Synced command: {command.name}")
     except Exception as e:
-        print(f"Error syncing global commands: {e}")
+        print(f"Error syncing commands: {e}")
 
 @bot.event
 async def on_message(message):
