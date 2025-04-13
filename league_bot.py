@@ -6,13 +6,16 @@ from typing import Optional, Literal
 import logging
 from dotenv import load_dotenv
 import discord
-from discord.ext import commands
 from discord import app_commands, Interaction, File
 import math
 
+# Constants
+DATABASE_NAME = "league.db"
+K_FACTOR = 32  # For ELO calculation
+INITIAL_ELO = 1000
+
 # Constants for ELO calculation
-K_FACTOR = 32  # How much each match affects rating
-BASE_ELO = 1000  # Starting ELO for new players
+BASE_ELO = INITIAL_ELO  # Starting ELO for new players
 
 # Rank tiers and their ELO ranges
 RANKS = {
@@ -38,18 +41,26 @@ BADGE_PATHS = {
 
 # Rank Emojis (fallback for when images can't be sent)
 RANK_EMOJIS = {
-    "Iron": "🔩",
-    "Bronze": "🥉",
-    "Silver": "🥈",
-    "Gold": "🥇",
-    "Platinum": "💎",
-    "Diamond": "💠",
-    "Master": "👑",
-    "Grandmaster": "🏆"
+    "Iron": "",
+    "Bronze": "",
+    "Silver": "",
+    "Gold": "",
+    "Platinum": "",
+    "Diamond": "",
+    "Master": "",
+    "Grandmaster": ""
 }
 
 DEV_MODE = os.getenv('DEV_MODE', 'false').lower() == 'true'
 TEST_GUILD_ID = int(os.getenv('TEST_GUILD_ID', '0'))  # Your test server's guild ID
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('discord')
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 
 def command_decorator(name: str, description: str, **kwargs):
     """
@@ -88,15 +99,7 @@ def get_rank(elo: float) -> tuple[str, str]:
     for rank, (min_elo, max_elo) in RANKS.items():
         if min_elo <= elo <= max_elo:
             return rank, RANK_EMOJIS[rank]
-    return "Unranked", "❓"
-
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
-logger.addHandler(handler)
+    return "Unranked", ""
 
 print("Current working directory:", os.getcwd())
 print("Loading environment variables...")
