@@ -1,12 +1,19 @@
-import { CommandInteraction, SlashCommandBuilder } from 'discord.js';
+import { CommandInteraction, SlashCommandBuilder, Collection } from 'discord.js';
+import type { Command } from '../types/commands.js';
 import { leagueCommands } from './league.js';
+import { matchCommands } from './match.js';
 
-export interface Command {
-  data: Omit<SlashCommandBuilder, "addSubcommandGroup" | "addSubcommand">;
-  execute: (interaction: CommandInteraction) => Promise<void>;
+// Create a collection of commands
+const commands = new Collection<string, Command>();
+
+// Add all league commands
+for (const command of leagueCommands) {
+    commands.set(command.data.name, command);
 }
 
-// Combine all commands
-export const commands: Command[] = [
-  ...leagueCommands
-];
+// Add all match commands
+for (const command of matchCommands) {
+    commands.set(command.data.name, command);
+}
+
+export { commands };

@@ -1,5 +1,4 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
-import { League } from './League.js';
 
 @Entity()
 export class Player {
@@ -21,6 +20,6 @@ export class Player {
   @CreateDateColumn()
   joinedAt!: Date;
 
-  @ManyToOne(() => League, league => league.players)
-  league!: League;
+  @ManyToOne('League', 'players')
+  league!: any;
 }

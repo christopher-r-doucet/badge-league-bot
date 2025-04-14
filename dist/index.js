@@ -1,10 +1,9 @@
-import { Client, Events, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { config } from 'dotenv';
 import { commands } from './commands/index.js';
 import { db } from './database/index.js';
 // Load environment variables
 config({ path: '.env.local' });
-// Create client instance
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -12,45 +11,74 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
     ]
 });
-// When the client is ready, run this code (only once)
-client.once(Events.ClientReady, async (c) => {
-    console.log(`Ready! Logged in as ${c.user.tag}`);
-    // Initialize database
-    await db.init();
-    // Register slash commands
-    const rest = client.rest;
+// Initialize database when client is ready
+client.once('ready', async () => {
     try {
+        await db.init();
+        console.log('Database initialized');
+        console.log('Ready! Logged in');
+        // Register commands
+        if (!client.application)
+            return;
+        const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+        const commandData = [...commands.values()].map(command => command.data.toJSON());
         console.log('Started refreshing application (/) commands.');
-        await rest.put(`/applications/${client.user?.id}/commands`, { body: commands.map(command => command.data.toJSON()) });
-        console.log('Successfully reloaded application (/) commands.');
+        console.log('Commands to register:', JSON.stringify(commandData, null, 2));
+        try {
+            await rest.put(Routes.applicationCommands(client.application.id), { body: commandData });
+            console.log('Successfully reloaded application (/) commands.');
+        }
+        catch (error) {
+            console.error('Error refreshing commands:', error);
+        }
     }
     catch (error) {
-        console.error(error);
+        console.error('Error during initialization:', error);
     }
 });
-// Handle interactions
-client.on(Events.InteractionCreate, async (interaction) => {
-    if (!interaction.isCommand())
+// Handle commands
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand())
         return;
-    const command = commands.find(cmd => cmd.data.name === interaction.commandName);
+    const command = commands.get(interaction.commandName);
     if (!command) {
-        console.error(`No command matching ${interaction.commandName} was found.`);
+        console.error(`Command ${interaction.commandName} not found`);
+        if (!interaction.replied) {
+            await interaction.reply({
+                content: 'Unknown command!',
+                ephemeral: true
+            });
+        }
         return;
     }
     try {
+        console.log(`Executing command: ${interaction.commandName}`);
+        console.log('Command options:', JSON.stringify(interaction.options.data, null, 2));
         await command.execute(interaction);
     }
     catch (error) {
-        console.error(error);
-        await interaction.reply({
-            content: 'There was an error while executing this command!',
-            ephemeral: true
-        });
+        console.error(`Error executing ${interaction.commandName}:`, error);
+        // Don't try to reply if we've already replied or deferred
+        if (interaction.replied || interaction.deferred) {
+            return;
+        }
+        try {
+            await interaction.reply({
+                content: 'There was an error while executing this command!',
+                ephemeral: true
+            });
+        }
+        catch (replyError) {
+            console.error('Error sending error response:', replyError);
+        }
     }
 });
-// Log in to Discord with your client's token
-const token = process.env.DISCORD_TOKEN;
-if (!token) {
-    throw new Error('No token found in environment variables');
-}
-client.login(token);
+// Handle errors
+client.on('error', error => {
+    console.error('Discord client error:', error);
+});
+process.on('unhandledRejection', error => {
+    console.error('Unhandled promise rejection:', error);
+});
+// Login
+client.login(process.env.DISCORD_TOKEN);

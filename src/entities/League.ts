@@ -1,8 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn } from 'typeorm';
 import { Player } from './Player.js';
+import type { ILeague } from '../types/entities.js';
 
 @Entity()
-export class League {
+export class League implements ILeague {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
@@ -12,6 +13,6 @@ export class League {
   @CreateDateColumn()
   createdAt!: Date;
 
-  @OneToMany(() => Player, player => player.league)
+  @OneToMany(() => Player, (player) => player.league)
   players!: Player[];
 }

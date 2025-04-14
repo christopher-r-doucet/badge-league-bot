@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
-import { League } from '../entities/League';
-import { Player } from '../entities/Player';
+import { League } from '../entities/League.js';
+import { Player } from '../entities/Player.js';
 class Database {
     dataSource;
     constructor() {
@@ -24,17 +24,19 @@ class Database {
     }
     async createLeague(name) {
         try {
+            console.log('Creating league:', name);
             const leagueRepository = this.dataSource.getRepository(League);
             // Check if league already exists
             const existingLeague = await leagueRepository.findOne({ where: { name } });
             if (existingLeague) {
+                console.log('League already exists:', existingLeague);
                 throw new Error(`League "${name}" already exists`);
             }
             // Create new league
             const league = leagueRepository.create({ name });
-            await leagueRepository.save(league);
-            console.log(`Created league: ${name}`);
-            return league;
+            const savedLeague = await leagueRepository.save(league);
+            console.log('Created league:', savedLeague);
+            return savedLeague;
         }
         catch (error) {
             console.error('Error creating league:', error);
@@ -81,8 +83,11 @@ class Database {
     }
     async getLeagues() {
         try {
+            console.log('Fetching leagues...');
             const leagueRepository = this.dataSource.getRepository(League);
-            return await leagueRepository.find();
+            const leagues = await leagueRepository.find();
+            console.log('Found leagues:', leagues);
+            return leagues;
         }
         catch (error) {
             console.error('Error getting leagues:', error);
