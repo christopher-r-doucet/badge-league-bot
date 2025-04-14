@@ -22,27 +22,31 @@ async function handleMatchIdAutocomplete(interaction: AutocompleteInteraction) {
   const userId = interaction.user.id;
   
   try {
-    // Get all matches for this user
-    const matches = await db.getMatchesByPlayer(userId);
+    // Get all matches for this user using the getPlayerMatches method instead
+    const matches = await db.getPlayerMatches(userId, MatchStatus.SCHEDULED);
     
     // Filter and format matches for autocomplete
     const filtered = matches
       .filter((match) => 
         match.id.toLowerCase().includes(focusedValue) || 
-        (match.player1Id === userId && match.player2Id.toLowerCase().includes(focusedValue)) ||
-        (match.player2Id === userId && match.player1Id.toLowerCase().includes(focusedValue))
+        match.status === MatchStatus.SCHEDULED // Only show scheduled matches
       )
       .slice(0, 25)
       .map((match) => {
         // Create a descriptive label
-        const isPlayer1 = match.player1Id === userId;
-        const opponentId = isPlayer1 ? match.player2Id : match.player1Id;
+        const isPlayer1 = match.player1.discordId === userId;
+        const opponent = isPlayer1 ? match.player2 : match.player1;
+        const opponentName = opponent ? opponent.username : 'Unknown player';
+        
         const matchDate = match.scheduledDate ? 
           new Date(match.scheduledDate).toLocaleDateString() : 
           'Instant match';
         
+        // Use a shorter ID format for display
+        const shortId = match.id.substring(0, 8);
+        
         return {
-          name: `Match vs ${opponentId} (${matchDate}) - ${match.id.substring(0, 8)}...`,
+          name: `Match vs ${opponentName} (${matchDate}) - ID: ${shortId}`,
           value: match.id
         };
       });
@@ -370,9 +374,20 @@ const viewMatchesCommand: Command = {
             ? `Scheduled for ${formatDate(new Date(match.scheduledDate))}` 
             : 'Instant match (waiting for acceptance)';
           
+          const confirmationStatus = match.player1Confirmed && match.player2Confirmed 
+            ? '✅ Both players confirmed' 
+            : match.player1Confirmed 
+              ? '⏳ Waiting for player 2 confirmation' 
+              : match.player2Confirmed 
+                ? '⏳ Waiting for player 1 confirmation'
+                : '⏳ Waiting for both players to confirm';
+          
+          const leagueInfo = `League: ${match.league.name}`;
+          const opponentId = interaction.user.id === match.player1Id ? match.player2Id : match.player1Id;
+          
           embed.addFields({
             name: `Match #${index + 1}`,
-            value: `**Players**: <@${match.player1Id}> vs <@${match.player2Id}>\n**Status**: ${match.status}\n**Date**: ${dateInfo}\n**ID**: \`${match.id}\``,
+            value: `**Players**: <@${match.player1Id}> vs <@${match.player2Id}>\n**Status**: ${match.status}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
             inline: false
           });
         });
@@ -444,7 +459,7 @@ const myMatchesCommand: Command = {
           
           embed.addFields({
             name: `Match #${index + 1}`,
-            value: `**Opponent**: <@${opponentId}>\n**Status**: ${match.status}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id}\``,
+            value: `**Opponent**: <@${opponentId}>\n**Status**: ${match.status}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
             inline: false
           });
         });
