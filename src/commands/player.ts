@@ -40,6 +40,19 @@ function getRankColor(rank: Rank): number {
     return colors[rank as Rank] || colors['Bronze']; // Default to Bronze if rank not found
 }
 
+// Helper function to get rank emoji
+function getRankEmoji(rank: Rank): string {
+    switch (rank) {
+        case 'Diamond': return '<:diamond:1361443608506532164>';
+        case 'Grandmaster': return '<:grandmaster:1361443558128881814>';
+        case 'Master': return '<:master:1361443524226322474>';
+        case 'Gold': return '<:gold:1361443575543627822>';
+        case 'Silver': return '<:silver:1361443541070643443>';
+        case 'Bronze': return '<:bronze:1361443594963255346>';
+        default: return '•';
+    }
+}
+
 const playerStatusCommand = {
     data: new SlashCommandBuilder()
         .setName('status')
@@ -64,10 +77,10 @@ const playerStatusCommand = {
         // Create a rich embed for the player's status
         const embed = new EmbedBuilder()
             .setColor(getRankColor(stats.rank as Rank))
-            .setTitle(`${interaction.user.username}'s Profile`)
+            .setTitle(`${getRankEmoji(stats.rank as Rank)} ${interaction.user.username}'s Profile`)
             .setThumbnail(`attachment://${badgeFileName}`)
             .addFields(
-                { name: 'Current Rank', value: stats.rank, inline: true },
+                { name: 'Current Rank', value: `${getRankEmoji(stats.rank as Rank)} ${stats.rank}`, inline: true },
                 { name: 'ELO Rating', value: stats.elo.toString(), inline: true },
                 { name: '\u200B', value: '\u200B', inline: true }, // Blank field for alignment
                 { name: 'Wins', value: stats.wins.toString(), inline: true },

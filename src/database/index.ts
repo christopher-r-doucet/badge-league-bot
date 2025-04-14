@@ -96,7 +96,9 @@ class Database {
     try {
       console.log('Fetching leagues...');
       const leagueRepository = this.dataSource.getRepository(League);
-      const leagues = await leagueRepository.find();
+      const leagues = await leagueRepository.find({
+        relations: ['players']
+      });
       console.log('Found leagues:', leagues);
       return leagues;
     } catch (error) {
@@ -174,6 +176,52 @@ class Database {
       return player;
     } catch (error) {
       console.error('Error getting player stats:', error);
+      throw error;
+    }
+  }
+
+  async invitePlayerToLeague(leagueName: string, inviterId: string, inviteeId: string): Promise<{ league: League, inviter: Player | null }> {
+    try {
+      const leagueRepository = this.dataSource.getRepository(League);
+      const playerRepository = this.dataSource.getRepository(Player);
+
+      // Find the league
+      const league = await leagueRepository.findOne({ 
+        where: { name: leagueName },
+        relations: ['players']
+      });
+
+      if (!league) {
+        throw new Error(`League "${leagueName}" not found`);
+      }
+
+      // Check if inviter is in the league
+      const inviter = await playerRepository.findOne({
+        where: { 
+          discordId: inviterId,
+          league: { id: league.id }
+        }
+      });
+
+      if (!inviter) {
+        throw new Error('You must be a member of the league to invite others');
+      }
+
+      // Check if invitee is already in the league
+      const existingInvitee = await playerRepository.findOne({
+        where: { 
+          discordId: inviteeId,
+          league: { id: league.id }
+        }
+      });
+
+      if (existingInvitee) {
+        throw new Error('This player is already in the league');
+      }
+
+      return { league, inviter };
+    } catch (error) {
+      console.error('Error inviting player to league:', error);
       throw error;
     }
   }

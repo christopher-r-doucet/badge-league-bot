@@ -14,22 +14,12 @@ if (!process.env.DISCORD_TOKEN || !process.env.CLIENT_ID || !process.env.GUILD_I
 }
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-const isDevelopment = process.env.NODE_ENV !== 'production';
 
 async function listRegisteredCommands() {
     try {
         console.log('Fetching registered commands...');
 
-        // Get global commands
-        console.log('\nProduction (Global) commands:');
-        const globalCommands = await rest.get(
-            Routes.applicationCommands(process.env.CLIENT_ID!)
-        ) as any[];
-        console.log(`Found ${globalCommands.length} global commands:`);
-        globalCommands.forEach(cmd => console.log(`- ${cmd.name} (ID: ${cmd.id})`));
-
         // Get guild commands
-        console.log('\nDevelopment (Guild) commands:');
         const guildCommands = await rest.get(
             Routes.applicationGuildCommands(process.env.CLIENT_ID!, process.env.GUILD_ID!)
         ) as any[];
@@ -47,39 +37,19 @@ async function listRegisteredCommands() {
 
 async function deployCommands() {
     try {
-        console.log(`Started refreshing ${isDevelopment ? 'development' : 'production'} commands...`);
+        console.log('Started refreshing commands...');
 
-        // Get command data and prefix dev commands if in development
-        const commandData = Array.from(commands.values()).map(command => {
-            const data = command.data.toJSON();
-            if (isDevelopment) {
-                // Add dev_ prefix to command name
-                data.name = `dev_${data.name}`;
-                // Add [DEV] to command description
-                data.description = `[DEV] ${data.description}`;
-            }
-            return data;
-        });
+        // Get command data
+        const commandData = Array.from(commands.values()).map(command => command.data.toJSON());
 
-        if (isDevelopment) {
-            // Development: Use guild-specific commands with dev_ prefix
-            console.log('Registering development commands for guild...');
-            await rest.put(
-                Routes.applicationGuildCommands(process.env.CLIENT_ID!, process.env.GUILD_ID!),
-                { body: commandData }
-            );
-            console.log('Successfully registered development commands:', 
-                commandData.map(cmd => cmd.name).join(', '));
-        } else {
-            // Production: Use global commands without prefix
-            console.log('Registering production commands globally...');
-            await rest.put(
-                Routes.applicationCommands(process.env.CLIENT_ID!),
-                { body: commandData }
-            );
-            console.log('Successfully registered production commands:', 
-                commandData.map(cmd => cmd.name).join(', '));
-        }
+        // Register commands to guild
+        console.log('Registering commands...');
+        await rest.put(
+            Routes.applicationGuildCommands(process.env.CLIENT_ID!, process.env.GUILD_ID!),
+            { body: commandData }
+        );
+        console.log('Successfully registered commands:', 
+            commandData.map(cmd => cmd.name).join(', '));
 
         // List all registered commands to verify
         await listRegisteredCommands();

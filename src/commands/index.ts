@@ -6,13 +6,10 @@ import { playerCommands } from './player.js';
 // Create a collection of commands
 const commands = new Collection<string, Command>();
 
-const isDevelopment = process.env.NODE_ENV !== 'production';
-
 // Add all commands
 const allCommands = [...leagueCommands, ...playerCommands];
 for (const command of allCommands) {
-    const commandName = isDevelopment ? `dev_${command.data.name}` : command.data.name;
-    commands.set(commandName, command);
+    commands.set(command.data.name, command);
 }
 
 export { commands };
