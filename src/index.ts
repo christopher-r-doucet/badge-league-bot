@@ -180,6 +180,19 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
 async function handleMatchAccept(interaction: ButtonInteraction, matchId: string) {
   try {
     await interaction.deferReply();
+    
+    // Get match details first to check if the user is the challenger
+    const matchDetails = await db.getMatch(matchId);
+    if (!matchDetails) {
+      return interaction.editReply('Match not found.');
+    }
+    
+    // Check if the user trying to accept is the one who created the match
+    if (matchDetails.player1Id === interaction.user.id) {
+      return interaction.editReply('You cannot accept your own match challenge. The other player must accept it.');
+    }
+    
+    // Proceed with match confirmation
     const match = await db.confirmMatch(matchId, interaction.user.id);
     const enrichedMatch = await db.getMatch(matchId);
     
@@ -337,8 +350,8 @@ client.on('interactionCreate', async (interaction) => {
       }
       
       // Check if user is a participant
-      const isPlayer1 = matchBefore.player1.discordId === interaction.user.id;
-      const isPlayer2 = matchBefore.player2.discordId === interaction.user.id;
+      const isPlayer1 = matchBefore.player1Id === interaction.user.id;
+      const isPlayer2 = matchBefore.player2Id === interaction.user.id;
       
       if (!isPlayer1 && !isPlayer2) {
         return interaction.editReply('You are not a participant in this match.');
