@@ -1,6 +1,17 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
+import { ChatInputCommandInteraction, SlashCommandBuilder, AutocompleteInteraction } from 'discord.js';
 import type { Command } from '../types/commands.js';
 import { db } from '../database/index.js';
+
+// Helper function for league name autocomplete
+async function handleLeagueAutocomplete(interaction: AutocompleteInteraction) {
+  const focusedValue = interaction.options.getFocused().toLowerCase();
+  const leagues = await db.getLeagues();
+  const filtered = leagues
+    .filter(league => league.name.toLowerCase().includes(focusedValue))
+    .slice(0, 25) // Discord has a limit of 25 choices
+    .map(league => ({ name: league.name, value: league.name }));
+  await interaction.respond(filtered);
+}
 
 const createLeagueCommand = {
   data: new SlashCommandBuilder()
@@ -15,11 +26,9 @@ const createLeagueCommand = {
         .setMaxLength(50)
     ),
   execute: async (interaction: ChatInputCommandInteraction) => {
-    // Defer reply immediately to prevent timeout
     await interaction.deferReply();
 
     try {
-      // Since we marked it as required, we can safely use getString
       const name = interaction.options.getString('league_name', true);
       console.log('Creating league with name:', name);
 
@@ -27,7 +36,6 @@ const createLeagueCommand = {
       await interaction.editReply(`Created new league: ${name}`);
     } catch (error) {
       console.error('Error in create_league:', error);
-      // Since we deferred, we must use editReply
       await interaction.editReply({ 
         content: error instanceof Error && error.message.includes('already exists')
           ? error.message
@@ -48,7 +56,11 @@ const joinLeagueCommand = {
         .setRequired(true)
         .setMinLength(1)
         .setMaxLength(50)
+        .setAutocomplete(true)
     ),
+  async autocomplete(interaction: AutocompleteInteraction) {
+    await handleLeagueAutocomplete(interaction);
+  },
   execute: async (interaction: ChatInputCommandInteraction) => {
     await interaction.deferReply();
 
@@ -107,7 +119,11 @@ const leagueStandingsCommand = {
         .setRequired(true)
         .setMinLength(1)
         .setMaxLength(50)
+        .setAutocomplete(true)
     ),
+  async autocomplete(interaction: AutocompleteInteraction) {
+    await handleLeagueAutocomplete(interaction);
+  },
   execute: async (interaction: ChatInputCommandInteraction) => {
     await interaction.deferReply();
 
