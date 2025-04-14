@@ -230,17 +230,10 @@ const reportResultCommand: Command = {
         .setRequired(true)
         .setAutocomplete(true)
     )
-    .addIntegerOption(option => 
-      option.setName('your_score')
-        .setDescription('Your score')
+    .addBooleanOption(option => 
+      option.setName('did_you_win')
+        .setDescription('Did you win the match?')
         .setRequired(true)
-        .setMinValue(0)
-    )
-    .addIntegerOption(option => 
-      option.setName('opponent_score')
-        .setDescription('Opponent\'s score')
-        .setRequired(true)
-        .setMinValue(0)
     ) as unknown as SlashCommandBuilder,
   
   async autocomplete(interaction: AutocompleteInteraction) {
@@ -255,12 +248,7 @@ const reportResultCommand: Command = {
       // Don't defer reply here since it's already deferred in index.ts
       
       const matchId = interaction.options.getString('match_id', true);
-      const yourScore = interaction.options.getInteger('your_score', true);
-      const opponentScore = interaction.options.getInteger('opponent_score', true);
-      
-      if (yourScore === opponentScore) {
-        return interaction.editReply('Scores cannot be equal. There must be a winner.');
-      }
+      const didWin = interaction.options.getBoolean('did_you_win', true);
       
       try {
         // Get match details first to determine player positions
@@ -279,14 +267,15 @@ const reportResultCommand: Command = {
         }
         
         // Determine which score belongs to which player
+        // Winner gets 1, loser gets 0
         let player1Score, player2Score;
         
         if (isPlayer1) {
-          player1Score = yourScore;
-          player2Score = opponentScore;
+          player1Score = didWin ? 1 : 0;
+          player2Score = didWin ? 0 : 1;
         } else {
-          player1Score = opponentScore;
-          player2Score = yourScore;
+          player1Score = didWin ? 0 : 1;
+          player2Score = didWin ? 1 : 0;
         }
         
         // Report the result
@@ -299,10 +288,8 @@ const reportResultCommand: Command = {
         
         // Get enriched match with player details
         const enrichedMatch = await db.getMatch(matchId);
-        const winner = player1Score > player2Score ? enrichedMatch.player1 : enrichedMatch.player2;
-        const loser = player1Score > player2Score ? enrichedMatch.player2 : enrichedMatch.player1;
-        const winnerScore = player1Score > player2Score ? player1Score : player2Score;
-        const loserScore = player1Score > player2Score ? player2Score : player1Score;
+        const winner = didWin ? interaction.user : (isPlayer1 ? enrichedMatch.player2 : enrichedMatch.player1);
+        const loser = didWin ? (isPlayer1 ? enrichedMatch.player2 : enrichedMatch.player1) : interaction.user;
         
         // Create embed
         const embed = new EmbedBuilder()
@@ -310,9 +297,9 @@ const reportResultCommand: Command = {
           .setTitle('Match Result Reported')
           .setDescription(`Match in ${enrichedMatch.league.name} has been completed!`)
           .addFields(
-            { name: 'Winner', value: `<@${winner.discordId}> (${winnerScore})`, inline: true },
-            { name: 'Loser', value: `<@${loser.discordId}> (${loserScore})`, inline: true },
-            { name: 'New ELO', value: `${winner.username}: ${winner.elo} (+${winnerScore - loserScore})\n${loser.username}: ${loser.elo} (-${winnerScore - loserScore})`, inline: false }
+            { name: 'Winner', value: `<@${winner.discordId}>`, inline: true },
+            { name: 'Loser', value: `<@${loser.discordId}>`, inline: true },
+            { name: 'New ELO', value: `${winner.username}: ${winner.elo}\n${loser.username}: ${loser.elo}`, inline: false }
           );
         
         await interaction.editReply({ embeds: [embed] });
