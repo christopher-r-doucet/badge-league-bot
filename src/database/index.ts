@@ -17,10 +17,15 @@ class Database {
     // In production (Heroku), use DATABASE_URL if available
     if (process.env.NODE_ENV === 'production') {
       if (process.env.DATABASE_URL) {
-        console.log('Using database URL from environment');
+        console.log('Using PostgreSQL database from DATABASE_URL');
+        
+        // Parse the DATABASE_URL to extract connection details
+        const databaseUrl = process.env.DATABASE_URL;
+        console.log(`Database URL: ${databaseUrl.replace(/:[^:@]+@/, ':****@')}`); // Log URL with password hidden
+        
         this.dataSource = new DataSource({
           type: 'postgres',
-          url: process.env.DATABASE_URL,
+          url: databaseUrl,
           ssl: {
             rejectUnauthorized: false
           },
