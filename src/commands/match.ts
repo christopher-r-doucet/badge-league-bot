@@ -108,7 +108,7 @@ const scheduleMatchCommand: Command = {
       const instantMatch = interaction.options.getBoolean('instant_match') || false;
       
       if (opponent.id === interaction.user.id) {
-        return interaction.editReply('You cannot schedule a match against yourself.');
+        return interaction.editReply('You cannot challenge yourself to a match. Please select a different opponent.');
       }
       
       let scheduledDate: Date | undefined = undefined;
@@ -404,52 +404,96 @@ const myMatchesCommand: Command = {
       // Don't defer reply here since it's already deferred in index.ts
       
       try {
-        const matches = await db.getMatchesByPlayer(interaction.user.id);
+        const matches = await db.getPlayerMatches(interaction.user.id);
         
         if (matches.length === 0) {
-          return interaction.editReply('You have no scheduled matches.');
+          return interaction.editReply('You have no matches.');
         }
         
-        // Filter to only show scheduled matches
+        // Filter matches by status
         const scheduledMatches = matches.filter(match => match.status === MatchStatus.SCHEDULED);
+        const completedMatches = matches.filter(match => match.status === MatchStatus.COMPLETED);
         
-        if (scheduledMatches.length === 0) {
-          return interaction.editReply('You have no scheduled matches.');
+        if (scheduledMatches.length === 0 && completedMatches.length === 0) {
+          return interaction.editReply('You have no matches.');
         }
         
         // Create embed
         const embed = new EmbedBuilder()
           .setColor(0x0099FF)
-          .setTitle('Your Upcoming Matches')
-          .setDescription(`You have ${scheduledMatches.length} scheduled matches.`)
+          .setTitle('Your Matches')
+          .setDescription(`You have ${scheduledMatches.length} scheduled and ${completedMatches.length} completed matches.`)
           .setTimestamp()
           .setFooter({ text: 'Badge League Bot' });
         
-        // Add each match
-        scheduledMatches.forEach((match, index) => {
-          // Determine opponent
-          const isPlayer1 = match.player1Id === interaction.user.id;
-          const opponentId = isPlayer1 ? match.player2Id : match.player1Id;
-          
-          // Format date
-          const dateInfo = match.scheduledDate 
-            ? formatDate(match.scheduledDate) 
-            : 'Instant match (no scheduled date)';
-          
-          // Confirmation status
-          const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
-          const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
-          const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
-          
-          // Get league name
-          const leagueInfo = `League ID: ${match.leagueId}`;
-          
+        // Add scheduled matches
+        if (scheduledMatches.length > 0) {
           embed.addFields({
-            name: `Match #${index + 1}`,
-            value: `**Opponent**: <@${opponentId}>\n**Status**: ${match.status}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+            name: '📅 Upcoming Matches',
+            value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━',
             inline: false
           });
-        });
+          
+          // Add each scheduled match
+          scheduledMatches.forEach((match, index) => {
+            // Determine opponent
+            const isPlayer1 = match.player1Id === interaction.user.id;
+            const opponentId = isPlayer1 ? match.player2Id : match.player1Id;
+            
+            // Format date
+            const dateInfo = match.scheduledDate 
+              ? formatDate(match.scheduledDate) 
+              : 'Instant match (no scheduled date)';
+            
+            // Confirmation status
+            const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
+            const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
+            const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
+            
+            // Get league name
+            const leagueInfo = `League ID: ${match.leagueId}`;
+            
+            embed.addFields({
+              name: `Match #${index + 1}`,
+              value: `**Opponent**: <@${opponentId}>\n**Status**: ${match.status}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+              inline: false
+            });
+          });
+        }
+        
+        // Add completed matches
+        if (completedMatches.length > 0) {
+          embed.addFields({
+            name: '🏆 Completed Matches',
+            value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+            inline: false
+          });
+          
+          // Add each completed match (up to 5 most recent)
+          completedMatches
+            .sort((a, b) => new Date(b.completedDate || 0).getTime() - new Date(a.completedDate || 0).getTime())
+            .slice(0, 5)
+            .forEach((match, index) => {
+              // Determine opponent and result
+              const isPlayer1 = match.player1Id === interaction.user.id;
+              const opponentId = isPlayer1 ? match.player2Id : match.player1Id;
+              const didWin = (isPlayer1 && match.winnerId === match.player1Id) || (!isPlayer1 && match.winnerId === match.player2Id);
+              
+              // Format completion date
+              const dateInfo = match.completedDate 
+                ? formatDate(match.completedDate) 
+                : 'Unknown date';
+              
+              // Get league name
+              const leagueInfo = `League ID: ${match.leagueId}`;
+              
+              embed.addFields({
+                name: `Match #${index + 1}`,
+                value: `**Opponent**: <@${opponentId}>\n**Result**: ${didWin ? '🏆 Win' : '❌ Loss'}\n**Date**: ${dateInfo}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+                inline: false
+              });
+            });
+        }
         
         // Add action buttons for the first match
         const firstMatch = scheduledMatches[0];

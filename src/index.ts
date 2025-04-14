@@ -188,7 +188,8 @@ async function handleMatchAccept(interaction: ButtonInteraction, matchId: string
     }
     
     // Check if the user trying to accept is the one who created the match
-    if (matchDetails.player1Id === interaction.user.id) {
+    // We need to compare Discord IDs, not database IDs
+    if (matchDetails.player1.discordId === interaction.user.id) {
       return interaction.editReply('You cannot accept your own match challenge. The other player must accept it.');
     }
     
