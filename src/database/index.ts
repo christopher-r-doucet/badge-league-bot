@@ -4,14 +4,54 @@ import { League } from '../entities/League.js';
 import { Player } from '../entities/Player.js';
 import { Match, MatchStatus } from '../entities/Match.js';
 import type { Rank } from '../entities/Player.js';
+import path from 'path';
+import fs from 'fs';
 
 class Database {
   private dataSource: DataSource;
 
   constructor() {
+    // Determine database path based on environment
+    let dbPath = 'league.db';
+    
+    // In production (Heroku), use DATABASE_URL if available
+    if (process.env.NODE_ENV === 'production') {
+      if (process.env.DATABASE_URL) {
+        console.log('Using database URL from environment');
+        this.dataSource = new DataSource({
+          type: 'postgres',
+          url: process.env.DATABASE_URL,
+          ssl: {
+            rejectUnauthorized: false
+          },
+          synchronize: true,
+          entities: [League, Player, Match],
+          logging: ['error', 'warn']
+        });
+        return;
+      } else {
+        // Fallback to SQLite in a more persistent location
+        const dataDir = process.env.DATA_DIR || '/app/data';
+        try {
+          if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+          }
+          dbPath = path.join(dataDir, 'league.db');
+          console.log(`Using database path: ${dbPath}`);
+        } catch (error) {
+          console.error('Error creating data directory:', error);
+          // Fallback to current directory
+          dbPath = 'league.db';
+          console.log(`Falling back to database path: ${dbPath}`);
+        }
+      }
+    } else {
+      console.log(`Using development database path: ${dbPath}`);
+    }
+    
     this.dataSource = new DataSource({
       type: 'sqlite',
-      database: 'league.db',
+      database: dbPath,
       synchronize: true,
       entities: [League, Player, Match],
       logging: ['error', 'warn']
@@ -22,6 +62,21 @@ class Database {
     try {
       await this.dataSource.initialize();
       console.log('Database initialized successfully');
+      
+      // Log some diagnostic information
+      const leagueRepository = this.dataSource.getRepository(League);
+      const leagues = await leagueRepository.find();
+      console.log(`Found ${leagues.length} leagues in database`);
+      
+      // Create a test league if none exist and we're in development
+      if (leagues.length === 0 && process.env.NODE_ENV === 'development') {
+        console.log('Creating a test league...');
+        const testLeague = new League();
+        testLeague.name = 'Test League';
+        testLeague.createdAt = new Date();
+        await leagueRepository.save(testLeague);
+        console.log('Test league created');
+      }
     } catch (error) {
       console.error('Error initializing database:', error);
       throw error;
