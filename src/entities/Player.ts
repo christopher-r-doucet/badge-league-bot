@@ -16,7 +16,7 @@ export class Player {
   @Column({ default: 1000 })
   elo: number;
 
-  @Column({ default: 'Bronze' })
+  @Column({ type: 'varchar', default: 'Bronze' })
   rank: Rank;
 
   @Column({ default: 0 })

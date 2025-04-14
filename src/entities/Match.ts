@@ -27,7 +27,7 @@ export class Match {
   player2Score: number;
 
   @Column({
-    type: 'simple-enum',
+    type: 'varchar',
     enum: MatchStatus,
     default: MatchStatus.SCHEDULED
   })
@@ -42,10 +42,10 @@ export class Match {
   @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ nullable: true, type: 'datetime' })
+  @Column({ nullable: true, type: 'timestamp' })
   scheduledDate: Date | null;
 
-  @Column({ nullable: true, type: 'datetime' })
+  @Column({ nullable: true, type: 'timestamp' })
   completedDate: Date;
 
   @Column({ default: false })
