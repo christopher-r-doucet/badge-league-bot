@@ -13,11 +13,27 @@ const leagueCommands = [
             .setDescription('The name of the league')
             .setRequired(true))),
         execute: async (interaction) => {
-            if (!interaction.isChatInputCommand())
-                return;
-            const name = interaction.options.getString('name', true);
-            await db.createLeague(name);
-            await interaction.reply(`Created new league: ${name}`);
+            try {
+                if (!interaction.isChatInputCommand())
+                    return;
+                const name = interaction.options.getString('name');
+                if (!name) {
+                    await interaction.reply({
+                        content: 'Please provide a league name',
+                        ephemeral: true
+                    });
+                    return;
+                }
+                await db.createLeague(name);
+                await interaction.reply(`Created new league: ${name}`);
+            }
+            catch (error) {
+                console.error('Error in create_league:', error);
+                await interaction.reply({
+                    content: 'There was an error creating the league',
+                    ephemeral: true
+                });
+            }
         }
     },
     {
@@ -29,11 +45,27 @@ const leagueCommands = [
             .setDescription('The name of the league')
             .setRequired(true))),
         execute: async (interaction) => {
-            if (!interaction.isChatInputCommand())
-                return;
-            const name = interaction.options.getString('name', true);
-            await db.addPlayerToLeague(interaction.user.id, name);
-            await interaction.reply(`You have joined the league: ${name}`);
+            try {
+                if (!interaction.isChatInputCommand())
+                    return;
+                const name = interaction.options.getString('name');
+                if (!name) {
+                    await interaction.reply({
+                        content: 'Please provide a league name',
+                        ephemeral: true
+                    });
+                    return;
+                }
+                await db.addPlayerToLeague(interaction.user.id, name);
+                await interaction.reply(`You have joined the league: ${name}`);
+            }
+            catch (error) {
+                console.error('Error in join_league:', error);
+                await interaction.reply({
+                    content: 'There was an error joining the league',
+                    ephemeral: true
+                });
+            }
         }
     },
     {
@@ -41,13 +73,22 @@ const leagueCommands = [
             .setName('list_leagues')
             .setDescription('List all available leagues')),
         execute: async (interaction) => {
-            const leagues = await db.getLeagues();
-            if (leagues.length === 0) {
-                await interaction.reply('No leagues found');
-                return;
+            try {
+                const leagues = await db.getLeagues();
+                if (leagues.length === 0) {
+                    await interaction.reply('No leagues found');
+                    return;
+                }
+                const leagueList = leagues.map(league => `- ${league.name}`).join('\n');
+                await interaction.reply(`Available leagues:\n${leagueList}`);
             }
-            const leagueList = leagues.map(league => `- ${league.name}`).join('\n');
-            await interaction.reply(`Available leagues:\n${leagueList}`);
+            catch (error) {
+                console.error('Error in list_leagues:', error);
+                await interaction.reply({
+                    content: 'There was an error listing leagues',
+                    ephemeral: true
+                });
+            }
         }
     },
     {
@@ -59,18 +100,34 @@ const leagueCommands = [
             .setDescription('The name of the league')
             .setRequired(true))),
         execute: async (interaction) => {
-            if (!interaction.isChatInputCommand())
-                return;
-            const name = interaction.options.getString('name', true);
-            const standings = await db.getLeagueStandings(name);
-            if (!standings) {
-                await interaction.reply(`League not found: ${name}`);
-                return;
+            try {
+                if (!interaction.isChatInputCommand())
+                    return;
+                const name = interaction.options.getString('name');
+                if (!name) {
+                    await interaction.reply({
+                        content: 'Please provide a league name',
+                        ephemeral: true
+                    });
+                    return;
+                }
+                const standings = await db.getLeagueStandings(name);
+                if (!standings) {
+                    await interaction.reply(`League not found: ${name}`);
+                    return;
+                }
+                const standingsList = standings
+                    .map((player, index) => `${index + 1}. ${player.username} - ${player.elo} ELO (${player.rank})`)
+                    .join('\n');
+                await interaction.reply(`Standings for ${name}:\n${standingsList}`);
             }
-            const standingsList = standings
-                .map((player, index) => `${index + 1}. ${player.username} - ${player.elo} ELO (${player.rank})`)
-                .join('\n');
-            await interaction.reply(`Standings for ${name}:\n${standingsList}`);
+            catch (error) {
+                console.error('Error in league_standings:', error);
+                await interaction.reply({
+                    content: 'There was an error getting league standings',
+                    ephemeral: true
+                });
+            }
         }
     }
 ];
