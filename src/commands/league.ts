@@ -1,6 +1,6 @@
 import { CommandInteraction, SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from 'discord.js';
-import type { Command } from './index';
-import { db } from '../database';
+import type { Command } from './index.js';
+import { db } from '../database/index.js';
 
 const createCommand = (builder: SlashCommandOptionsOnlyBuilder): Command['data'] => {
   return builder as unknown as Command['data'];

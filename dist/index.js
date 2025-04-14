@@ -1,7 +1,7 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { config } from 'dotenv';
-import { commands } from './commands';
-import { db } from './database';
+import { commands } from './commands/index.js';
+import { db } from './database/index.js';
 // Load environment variables
 config({ path: '.env.local' });
 // Create client instance

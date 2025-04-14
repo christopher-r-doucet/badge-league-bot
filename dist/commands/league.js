@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { db } from '../database';
+import { db } from '../database/index.js';
 const createCommand = (builder) => {
     return builder;
 };
