@@ -1,5 +1,15 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { db } from '../database/index.js';
+// Helper function for league name autocomplete
+async function handleLeagueAutocomplete(interaction) {
+    const focusedValue = interaction.options.getFocused().toLowerCase();
+    const leagues = await db.getLeagues();
+    const filtered = leagues
+        .filter(league => league.name.toLowerCase().includes(focusedValue))
+        .slice(0, 25) // Discord has a limit of 25 choices
+        .map(league => ({ name: league.name, value: league.name }));
+    await interaction.respond(filtered);
+}
 const createLeagueCommand = {
     data: new SlashCommandBuilder()
         .setName('create_league')
@@ -11,10 +21,8 @@ const createLeagueCommand = {
         .setMinLength(1)
         .setMaxLength(50)),
     execute: async (interaction) => {
-        // Defer reply immediately to prevent timeout
         await interaction.deferReply();
         try {
-            // Since we marked it as required, we can safely use getString
             const name = interaction.options.getString('league_name', true);
             console.log('Creating league with name:', name);
             await db.createLeague(name);
@@ -22,7 +30,6 @@ const createLeagueCommand = {
         }
         catch (error) {
             console.error('Error in create_league:', error);
-            // Since we deferred, we must use editReply
             await interaction.editReply({
                 content: error instanceof Error && error.message.includes('already exists')
                     ? error.message
@@ -40,7 +47,11 @@ const joinLeagueCommand = {
         .setDescription('The name of the league')
         .setRequired(true)
         .setMinLength(1)
-        .setMaxLength(50)),
+        .setMaxLength(50)
+        .setAutocomplete(true)),
+    async autocomplete(interaction) {
+        await handleLeagueAutocomplete(interaction);
+    },
     execute: async (interaction) => {
         await interaction.deferReply();
         try {
@@ -92,7 +103,11 @@ const leagueStandingsCommand = {
         .setDescription('The name of the league')
         .setRequired(true)
         .setMinLength(1)
-        .setMaxLength(50)),
+        .setMaxLength(50)
+        .setAutocomplete(true)),
+    async autocomplete(interaction) {
+        await handleLeagueAutocomplete(interaction);
+    },
     execute: async (interaction) => {
         await interaction.deferReply();
         try {

@@ -113,5 +113,41 @@ class Database {
             throw error;
         }
     }
+    async registerPlayer(discordId, username) {
+        try {
+            const playerRepository = this.dataSource.getRepository(Player);
+            // Check if player is already registered
+            const existingPlayer = await playerRepository.findOne({ where: { discordId } });
+            if (existingPlayer) {
+                throw new Error('You are already registered');
+            }
+            // Create new player
+            const player = playerRepository.create({
+                discordId,
+                username,
+                elo: 1000,
+                rank: 'Bronze'
+            });
+            const savedPlayer = await playerRepository.save(player);
+            console.log('Registered player:', savedPlayer);
+            return savedPlayer;
+        }
+        catch (error) {
+            console.error('Error registering player:', error);
+            throw error;
+        }
+    }
+    updatePlayerRank(player) {
+        if (player.elo >= 2000)
+            player.rank = 'Diamond';
+        else if (player.elo >= 1800)
+            player.rank = 'Platinum';
+        else if (player.elo >= 1600)
+            player.rank = 'Gold';
+        else if (player.elo >= 1400)
+            player.rank = 'Silver';
+        else
+            player.rank = 'Bronze';
+    }
 }
 export const db = new Database();

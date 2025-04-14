@@ -17,6 +17,12 @@ export class Player {
   @Column()
   rank!: string;
 
+  @Column({ default: 0 })
+  wins!: number;
+
+  @Column({ default: 0 })
+  losses!: number;
+
   @CreateDateColumn()
   joinedAt!: Date;
 

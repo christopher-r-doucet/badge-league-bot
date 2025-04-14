@@ -154,6 +154,30 @@ class Database {
     }
   }
 
+  async getPlayerStats(discordId: string): Promise<Player | null> {
+    try {
+      console.log(`Getting stats for player ${discordId}`);
+      const playerRepository = this.dataSource.getRepository(Player);
+      
+      const player = await playerRepository.findOne({ 
+        where: { discordId },
+        relations: ['league'],
+        order: { elo: 'DESC' }  // Get their highest ranked league entry
+      });
+
+      if (!player) {
+        console.log(`No stats found for player ${discordId}`);
+        return null;
+      }
+
+      console.log(`Found stats for player ${discordId}:`, player);
+      return player;
+    } catch (error) {
+      console.error('Error getting player stats:', error);
+      throw error;
+    }
+  }
+
   private updatePlayerRank(player: Player): void {
     if (player.elo >= 2000) player.rank = 'Diamond';
     else if (player.elo >= 1800) player.rank = 'Platinum';

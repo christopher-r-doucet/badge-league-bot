@@ -2,8 +2,10 @@ import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { config } from 'dotenv';
 import { commands } from './commands/index.js';
 import { db } from './database/index.js';
-// Load environment variables
-config({ path: '.env.local' });
+// Load environment variables from .env.local in development
+if (process.env.NODE_ENV !== 'production') {
+    config({ path: '.env.local' });
+}
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -38,38 +40,51 @@ client.once('ready', async () => {
 });
 // Handle commands
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isChatInputCommand())
-        return;
-    const command = commands.get(interaction.commandName);
-    if (!command) {
-        console.error(`Command ${interaction.commandName} not found`);
-        if (!interaction.replied) {
-            await interaction.reply({
-                content: 'Unknown command!',
-                ephemeral: true
-            });
-        }
-        return;
-    }
-    try {
-        console.log(`Executing command: ${interaction.commandName}`);
-        console.log('Command options:', JSON.stringify(interaction.options.data, null, 2));
-        await command.execute(interaction);
-    }
-    catch (error) {
-        console.error(`Error executing ${interaction.commandName}:`, error);
-        // Don't try to reply if we've already replied or deferred
-        if (interaction.replied || interaction.deferred) {
+    if (interaction.isChatInputCommand()) {
+        const command = commands.get(interaction.commandName);
+        if (!command) {
+            console.error(`Command ${interaction.commandName} not found`);
+            if (!interaction.replied) {
+                await interaction.reply({
+                    content: 'Unknown command!',
+                    ephemeral: true
+                });
+            }
             return;
         }
         try {
-            await interaction.reply({
-                content: 'There was an error while executing this command!',
-                ephemeral: true
-            });
+            console.log(`Executing command: ${interaction.commandName}`);
+            console.log('Command options:', JSON.stringify(interaction.options.data, null, 2));
+            await command.execute(interaction);
         }
-        catch (replyError) {
-            console.error('Error sending error response:', replyError);
+        catch (error) {
+            console.error(`Error executing ${interaction.commandName}:`, error);
+            // Don't try to reply if we've already replied or deferred
+            if (interaction.replied || interaction.deferred) {
+                return;
+            }
+            try {
+                await interaction.reply({
+                    content: 'There was an error while executing this command!',
+                    ephemeral: true
+                });
+            }
+            catch (replyError) {
+                console.error('Error sending error response:', replyError);
+            }
+        }
+    }
+    else if (interaction.isAutocomplete()) {
+        const command = commands.get(interaction.commandName);
+        if (!command || !command.autocomplete) {
+            console.error(`No autocomplete handler for ${interaction.commandName} was found.`);
+            return;
+        }
+        try {
+            await command.autocomplete(interaction);
+        }
+        catch (error) {
+            console.error(`Error in autocomplete for ${interaction.commandName}:`, error);
         }
     }
 });
