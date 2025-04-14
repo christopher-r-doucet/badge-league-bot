@@ -68,7 +68,7 @@ const leagueCommands: Command[] = [
           return;
         }
         
-        await db.addPlayerToLeague(interaction.user.id, name);
+        await db.addPlayerToLeague(interaction, interaction.user.id, name);
         await interaction.reply(`You have joined the league: ${name}`);
       } catch (error) {
         console.error('Error in join_league:', error);
