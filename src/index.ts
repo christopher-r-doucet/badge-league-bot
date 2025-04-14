@@ -24,7 +24,95 @@ client.once(Events.ClientReady, c => {
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   // Handle button interactions
   if (interaction.isButton()) {
-    await handleButtonInteraction(interaction);
+    console.log(`Processing button interaction: ${interaction.customId}`);
+    const customId = interaction.customId;
+    
+    try {
+      // Handle match-related buttons
+      if (customId.startsWith('match_accept:')) {
+        const [_, matchId] = customId.split(':');
+        await handleMatchAccept(interaction, matchId);
+        return;
+      }
+      
+      if (customId.startsWith('match_decline:')) {
+        const [_, matchId] = customId.split(':');
+        await handleMatchDecline(interaction, matchId);
+        return;
+      }
+      
+      if (customId.startsWith('match_confirm:')) {
+        const [_, matchId] = customId.split(':');
+        await handleMatchConfirm(interaction, matchId);
+        return;
+      }
+      
+      if (customId.startsWith('match_report:')) {
+        const [_, matchId] = customId.split(':');
+        await handleMatchReport(interaction, matchId);
+        return;
+      }
+      
+      if (customId.startsWith('match_cancel:')) {
+        const [_, matchId] = customId.split(':');
+        await handleMatchCancel(interaction, matchId);
+        return;
+      }
+      
+      // Handle league join buttons
+      if (customId.startsWith('join_league:')) {
+        await interaction.deferReply({ ephemeral: true });
+        
+        try {
+          const [_, leagueName, targetUserId] = customId.split(':');
+          
+          // Verify the user clicking is the invited user
+          if (interaction.user.id !== targetUserId) {
+            await interaction.editReply({ content: 'This invitation is for someone else.' });
+            return;
+          }
+          
+          // Add the player to the league
+          await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName);
+          
+          // Create success message
+          await interaction.editReply({ 
+            content: `✅ You've successfully joined **${leagueName}**! Check your status with \`/status\`.`
+          });
+          
+          // Update the original message to show the invitation was accepted
+          const originalEmbed = interaction.message.embeds[0];
+          const updatedEmbed = {
+            ...originalEmbed.data,
+            color: 0x00FF00, // Green color
+            title: '✅ League Invitation Accepted',
+          };
+          
+          await interaction.message.edit({ 
+            embeds: [updatedEmbed],
+            components: [] // Remove buttons
+          });
+        } catch (error) {
+          console.error('Error handling league join:', error);
+          await interaction.editReply({ content: 'There was an error joining the league. Please try again later.' });
+        }
+        return;
+      }
+      
+      // If we get here, it's an unknown button type
+      await interaction.reply({ content: 'Unknown button action', ephemeral: true });
+    } catch (error) {
+      console.error(`Error handling button interaction: ${error}`);
+      try {
+        if (interaction.deferred) {
+          await interaction.editReply({ content: 'An error occurred while processing the button' });
+        } else {
+          await interaction.reply({ content: 'An error occurred while processing the button', ephemeral: true });
+        }
+      } catch (replyError) {
+        console.error('Error sending error response:', replyError);
+      }
+    }
     return;
   }
 
@@ -85,38 +173,6 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     } catch (e) {
       console.error('Error sending error message:', e);
     }
-  }
-});
-
-// Handle button interactions
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isButton()) return;
-
-  const [action, id] = interaction.customId.split(':');
-
-  try {
-    switch (action) {
-      case 'match_accept':
-        await handleMatchAccept(interaction, id);
-        break;
-      case 'match_decline':
-        await handleMatchDecline(interaction, id);
-        break;
-      case 'match_confirm':
-        await handleMatchConfirm(interaction, id);
-        break;
-      case 'match_report':
-        await handleMatchReport(interaction, id);
-        break;
-      case 'match_cancel':
-        await handleMatchCancel(interaction, id);
-        break;
-      default:
-        await interaction.reply({ content: 'Unknown button action', ephemeral: true });
-    }
-  } catch (error) {
-    console.error(`Error handling button interaction: ${error}`);
-    await interaction.reply({ content: 'An error occurred while processing the button', ephemeral: true });
   }
 });
 
@@ -332,179 +388,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 });
-
-// Handle button interactions
-async function handleButtonInteraction(interaction: ButtonInteraction) {
-  const customId = interaction.customId;
-  console.log(`Processing button interaction: ${customId}`);
-
-  // Handle join_league button
-  if (customId.startsWith('join_league:')) {
-    await interaction.deferReply({ ephemeral: true });
-    
-    try {
-      const [_, leagueName, targetUserId] = customId.split(':');
-      
-      // Verify the user clicking is the invited user
-      if (interaction.user.id !== targetUserId) {
-        await interaction.editReply({ content: 'This invitation is for someone else.' });
-        return;
-      }
-      
-      // Add the player to the league
-      await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName);
-      
-      // Create success message
-      await interaction.editReply({ 
-        content: `✅ You've successfully joined **${leagueName}**! Check your status with \`/status\`.`
-      });
-      
-      // Update the original message to show the invitation was accepted
-      const originalEmbed = interaction.message.embeds[0];
-      const updatedEmbed = {
-        ...originalEmbed.data,
-        color: 0x00FF00, // Green color
-        title: '✅ League Invitation Accepted',
-      };
-      
-      await interaction.message.edit({ 
-        embeds: [updatedEmbed],
-        components: [] // Remove the button
-      });
-      
-    } catch (error) {
-      console.error('Error handling join_league button:', error);
-      if (error instanceof Error) {
-        await interaction.editReply({ content: `❌ ${error.message}` });
-      } else {
-        await interaction.editReply({ content: '❌ Failed to join the league' });
-      }
-    }
-    return;
-  }
-
-  // Handle accept_match button
-  if (customId.startsWith('accept_match:')) {
-    await interaction.deferReply({ ephemeral: true });
-    
-    try {
-      const [_, matchId] = customId.split(':');
-      
-      // Confirm the match
-      const match = await db.confirmMatch(matchId, interaction.user.id);
-      
-      // Create success message
-      await interaction.editReply({ 
-        content: `✅ You've accepted the match! Good luck!`
-      });
-      
-      // Update the original message
-      const originalEmbed = interaction.message.embeds[0];
-      const updatedEmbed = {
-        ...originalEmbed.data,
-        fields: originalEmbed.data.fields?.map(field => {
-          if (field.name === 'Status') {
-            return {
-              ...field,
-              value: 'Match accepted! Both players ready to play.'
-            };
-          }
-          return field;
-        })
-      };
-      
-      // Remove the accept button but keep the cancel button
-      const cancelButton = new ButtonBuilder()
-        .setCustomId(`cancel_match:${matchId}`)
-        .setLabel('Cancel Match')
-        .setStyle(ButtonStyle.Danger);
-      
-      const reportButton = new ButtonBuilder()
-        .setCustomId(`report_match:${matchId}`)
-        .setLabel('Report Result')
-        .setStyle(ButtonStyle.Primary);
-      
-      const row = new ActionRowBuilder<ButtonBuilder>()
-        .addComponents(reportButton, cancelButton);
-      
-      await interaction.message.edit({ 
-        embeds: [updatedEmbed],
-        components: [row]
-      });
-      
-    } catch (error) {
-      console.error('Error handling accept_match button:', error);
-      if (error instanceof Error) {
-        await interaction.editReply({ content: `❌ ${error.message}` });
-      } else {
-        await interaction.editReply({ content: '❌ Failed to accept the match' });
-      }
-    }
-    return;
-  }
-
-  // Handle cancel_match button
-  if (customId.startsWith('cancel_match:')) {
-    await interaction.deferReply({ ephemeral: true });
-    
-    try {
-      const [_, matchId] = customId.split(':');
-      
-      // Cancel the match
-      await db.cancelMatch(matchId, interaction.user.id);
-      
-      // Create success message
-      await interaction.editReply({ 
-        content: `✅ You've cancelled the match.`
-      });
-      
-      // Update the original message
-      const originalEmbed = interaction.message.embeds[0];
-      const updatedEmbed = {
-        ...originalEmbed.data,
-        color: 0xFF0000, // Red color
-        title: '❌ Match Cancelled',
-      };
-      
-      await interaction.message.edit({ 
-        embeds: [updatedEmbed],
-        components: [] // Remove all buttons
-      });
-      
-    } catch (error) {
-      console.error('Error handling cancel_match button:', error);
-      if (error instanceof Error) {
-        await interaction.editReply({ content: `❌ ${error.message}` });
-      } else {
-        await interaction.editReply({ content: '❌ Failed to cancel the match' });
-      }
-    }
-    return;
-  }
-
-  // Handle report_match button
-  if (customId.startsWith('report_match:')) {
-    await interaction.deferReply({ ephemeral: true });
-    
-    try {
-      const [_, matchId] = customId.split(':');
-      
-      // Create a message with instructions to use the /report_result command
-      await interaction.editReply({ 
-        content: `To report the match result, please use the \`/report_result\` command with the following ID: \`${matchId}\``
-      });
-      
-    } catch (error) {
-      console.error('Error handling report_match button:', error);
-      if (error instanceof Error) {
-        await interaction.editReply({ content: `❌ ${error.message}` });
-      } else {
-        await interaction.editReply({ content: '❌ Failed to process report request' });
-      }
-    }
-    return;
-  }
-}
 
 // Initialize database and start bot
 async function main() {
