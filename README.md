@@ -1,5 +1,6 @@
 # Badge League Bot
 
+<<<<<<< HEAD
 A Discord bot for organizing and managing 1v1 competitive matches with a visual ranking system. Players earn badges as they climb through the ranks, making competition more engaging and rewarding.
 
 ## Setup Instructions
@@ -39,9 +40,30 @@ A Discord bot for organizing and managing 1v1 competitive matches with a visual 
 - **ELO Rating**: Competitive matchmaking using ELO rating system
 - **League Management**: Create and manage multiple leagues
 - **Leaderboard**: Visual standings display with rank badges
+=======
+A Discord bot for managing competitive leagues with badge/rank progression, written in TypeScript using discord.js.
 
-## Available Commands
+## Features
 
+- Create and manage leagues
+- Track player rankings and ELO
+- Automatic badge/rank progression
+- Match reporting and scheduling
+
+## Setup
+
+1. Install dependencies:
+```bash
+npm install
+```
+>>>>>>> 1a6312a (switch to typescript)
+
+2. Create a `.env.local` file with your Discord bot token:
+```
+DISCORD_TOKEN=your_token_here
+```
+
+<<<<<<< HEAD
 - `/create_league <name>` - Create a new league
 - `/join_league <name>` - Join an existing league
 - `/list_leagues` - View all available leagues
@@ -65,3 +87,32 @@ This bot is built with:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+=======
+3. Build the TypeScript code:
+```bash
+npm run build
+```
+
+4. Start the bot:
+```bash
+npm start
+```
+
+## Commands
+
+- `/create_league` - Create a new league
+- `/join_league` - Join an existing league
+- `/list_leagues` - Show all available leagues
+- `/league_standings` - View standings for a specific league
+
+## Development
+
+To run in development mode with auto-reloading:
+```bash
+npm run dev
+```
+
+## License
+
+MIT
+>>>>>>> 1a6312a (switch to typescript)
