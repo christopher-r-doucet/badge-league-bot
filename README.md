@@ -1,14 +1,22 @@
 # Badge League Bot
 
-<<<<<<< HEAD
-A Discord bot for organizing and managing 1v1 competitive matches with a visual ranking system. Players earn badges as they climb through the ranks, making competition more engaging and rewarding.
+A Discord bot for organizing and managing competitive leagues with a visual ranking system. Players earn badges as they climb through the ranks, making competition more engaging and rewarding.
+
+## Features
+
+- **Visual Ranking System**: Custom badges for each rank tier (Bronze, Silver, Gold, Diamond, Master, Grandmaster)
+- **ELO Rating**: Competitive matchmaking using ELO rating system
+- **League Management**: Create and manage multiple leagues
+- **Leaderboard**: Visual standings display with rank badges
+- **Interactive UI**: Rich embeds and interactive buttons for better user experience
+- **Autocomplete**: Smart suggestions when typing league names
 
 ## Setup Instructions
 
 1. **Create a Discord Bot Application**
    - Go to https://discord.com/developers/applications
    - Click "New Application"
-   - Give your bot a name (e.g., "LeagueBot")
+   - Give your bot a name (e.g., "Badge League Bot")
    - Click "Bot" in the sidebar and then "Add Bot"
    - Copy the Token
 
@@ -21,10 +29,17 @@ A Discord bot for organizing and managing 1v1 competitive matches with a visual 
    Create a file named `.env.local` in the same directory as the bot file and add:
    ```
    DISCORD_TOKEN=your_token_here
+   CLIENT_ID=your_client_id_here
+   GUILD_ID=your_guild_id_here
    ```
-   Replace `your_token_here` with the token you copied from Discord Developer Portal.
+   Replace with your actual values from the Discord Developer Portal.
 
-4. **Run the Bot**
+4. **Deploy Commands**
+   ```bash
+   npm run deploy-commands
+   ```
+
+5. **Run the Bot**
    ```bash
    # Development
    npm run dev
@@ -34,85 +49,53 @@ A Discord bot for organizing and managing 1v1 competitive matches with a visual 
    npm start
    ```
 
-## Features
+## Commands
 
-- **Visual Ranking System**: Custom badges for each rank tier (Bronze, Silver, Gold, Diamond, Master, Grandmaster)
-- **ELO Rating**: Competitive matchmaking using ELO rating system
-- **League Management**: Create and manage multiple leagues
-- **Leaderboard**: Visual standings display with rank badges
-=======
-A Discord bot for managing competitive leagues with badge/rank progression, written in TypeScript using discord.js.
-
-## Features
-
-- Create and manage leagues
-- Track player rankings and ELO
-- Automatic badge/rank progression
-- Match reporting and scheduling
-
-## Setup
-
-1. Install dependencies:
-```bash
-npm install
-```
->>>>>>> 1a6312a (switch to typescript)
-
-2. Create a `.env.local` file with your Discord bot token:
-```
-DISCORD_TOKEN=your_token_here
-```
-
-<<<<<<< HEAD
-- `/create_league <name>` - Create a new league
-- `/join_league <name>` - Join an existing league
-- `/list_leagues` - View all available leagues
-- `/league_standings <name>` - View standings for a specific league
+- `/create_league` - Create a new league with a custom name
+- `/join_league` - Join an existing league (with autocomplete)
+- `/list_leagues` - View all available leagues with player counts
+- `/league_standings` - View standings for a specific league with rank badges
+- `/invite_to_league` - Invite a player to join your league with a clickable button
+- `/status` - Check your current rank, ELO, wins, losses, and badge
+- `/help` - Display help information about the bot and available commands
 
 ## Development
 
 This bot is built with:
 - TypeScript
-- discord.js
+- discord.js v14
 - TypeORM with SQLite
 
-## Contributing
+### Local Development
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+To prevent "Interaction has already been acknowledged" errors:
+1. During local development:
+   - Scale down Heroku worker to 0: `heroku ps:scale worker=0 -a badge-league-bot`
+   - Run bot locally with `npm run dev`
+
+2. For production:
+   - Push changes to main branch
+   - Scale up Heroku worker to 1: `heroku ps:scale worker=1 -a badge-league-bot`
+
+This prevents multiple bot instances from trying to handle the same interactions.
+
+## Deployment
+
+The bot is deployed on Heroku:
+
+1. Push changes to GitHub:
+   ```bash
+   git add .
+   git commit -m "Your commit message"
+   git push origin main
+   ```
+
+2. Deploy to Heroku:
+   ```bash
+   git push heroku main
+   heroku ps:scale worker=1 -a badge-league-bot
+   ```
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-=======
-3. Build the TypeScript code:
-```bash
-npm run build
-```
-
-4. Start the bot:
-```bash
-npm start
-```
-
-## Commands
-
-- `/create_league` - Create a new league
-- `/join_league` - Join an existing league
-- `/list_leagues` - Show all available leagues
-- `/league_standings` - View standings for a specific league
-
-## Development
-
-To run in development mode with auto-reloading:
-```bash
-npm run dev
-```
-
-## License
-
-MIT
->>>>>>> 1a6312a (switch to typescript)
