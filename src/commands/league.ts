@@ -4,14 +4,12 @@ import { db } from '../database/index.js';
 
 // Helper function for league name autocomplete
 async function handleLeagueAutocomplete(interaction: AutocompleteInteraction) {
-  console.log('Fetching leagues for autocomplete...');
   const focusedValue = interaction.options.getFocused().toLowerCase();
   const leagues = await db.getLeagues();
-  console.log('Found leagues for autocomplete:', leagues);
   const filtered = leagues
-    .filter(league => league.name.toLowerCase().includes(focusedValue))
+    .filter((league) => league.name.toLowerCase().includes(focusedValue))
     .slice(0, 25) // Discord has a limit of 25 choices
-    .map(league => ({ name: league.name, value: league.name }));
+    .map((league) => ({ name: league.name, value: league.name }));
   await interaction.respond(filtered);
 }
 
@@ -82,13 +80,10 @@ const joinLeagueCommand = {
         .setRequired(true)
         .setAutocomplete(true)),
   async autocomplete(interaction: AutocompleteInteraction) {
-    const focusedValue = interaction.options.getFocused().toLowerCase();
-    const leagues = await db.getLeagues();
-    const filtered = leagues
-      .filter(league => league.name.toLowerCase().includes(focusedValue))
-      .slice(0, 25)
-      .map(league => ({ name: league.name, value: league.name }));
-    await interaction.respond(filtered);
+    const focusedOption = interaction.options.getFocused(true);
+    if (focusedOption.name === 'league') {
+      await handleLeagueAutocomplete(interaction);
+    }
   },
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
@@ -96,7 +91,7 @@ const joinLeagueCommand = {
     const leagueName = interaction.options.getString('league', true);
 
     try {
-      await db.addPlayerToLeague(interaction, interaction.user.id, leagueName);
+      const player = await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName);
       
       // Create success embed
       const embed = new EmbedBuilder()
@@ -156,10 +151,15 @@ const listLeaguesCommand = {
 
       // Add leagues list
       let leaguesText = '';
-      leagues.forEach((league, index) => {
+      
+      // Use Promise.all to handle async operations in forEach
+      await Promise.all(leagues.map(async (league, index) => {
         leaguesText += `${index + 1}. **${league.name}**\n`;
-        leaguesText += `   • Players: ${league.players?.length || 0}\n`;
-      });
+        
+        // Get player count for this league
+        const playerCount = await db.getPlayerCountByLeague(league.name);
+        leaguesText += `   • Players: ${playerCount}\n`;
+      }));
 
       embed.addFields({ 
         name: 'Leagues', 
@@ -194,13 +194,10 @@ const leagueStandingsCommand = {
         .setRequired(true)
         .setAutocomplete(true)),
   async autocomplete(interaction: AutocompleteInteraction) {
-    const focusedValue = interaction.options.getFocused().toLowerCase();
-    const leagues = await db.getLeagues();
-    const filtered = leagues
-      .filter(league => league.name.toLowerCase().includes(focusedValue))
-      .slice(0, 25)
-      .map(league => ({ name: league.name, value: league.name }));
-    await interaction.respond(filtered);
+    const focusedOption = interaction.options.getFocused(true);
+    if (focusedOption.name === 'league') {
+      await handleLeagueAutocomplete(interaction);
+    }
   },
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
@@ -283,13 +280,10 @@ const inviteToLeagueCommand = {
         .setDescription('The player to invite')
         .setRequired(true)),
   async autocomplete(interaction: AutocompleteInteraction) {
-    const focusedValue = interaction.options.getFocused().toLowerCase();
-    const leagues = await db.getLeagues();
-    const filtered = leagues
-      .filter(league => league.name.toLowerCase().includes(focusedValue))
-      .slice(0, 25)
-      .map(league => ({ name: league.name, value: league.name }));
-    await interaction.respond(filtered);
+    const focusedOption = interaction.options.getFocused(true);
+    if (focusedOption.name === 'league') {
+      await handleLeagueAutocomplete(interaction);
+    }
   },
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;

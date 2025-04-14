@@ -13,7 +13,11 @@
     "dev": "NODE_ENV=development node --import ./register.js src/index.ts",
     "watch": "tsc -w",
     "postinstall": "npm run build",
-    "deploy-commands": "NODE_ENV=development node --import ./register.js src/deploy-commands.ts"
+    "deploy-commands": "NODE_ENV=development node --import ./register.js src/deploy-commands.ts",
+    "test:ranking": "NODE_ENV=development node --import ./register.js test/ranking-system.test.ts",
+    "test:match": "NODE_ENV=development node --import ./register.js test/match-system.test.ts",
+    "test:elo": "NODE_ENV=development node --import ./register.js test/elo-edge-cases.test.ts",
+    "test": "npm run test:ranking && npm run test:match && npm run test:elo"
   },
   "dependencies": {
     "discord.js": "^14.14.1",

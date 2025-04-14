@@ -1,31 +1,39 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+
+export type Rank = 'Bronze' | 'Silver' | 'Gold' | 'Diamond' | 'Master' | 'Grandmaster';
 
 @Entity()
 export class Player {
   @PrimaryGeneratedColumn('uuid')
-  id!: string;
+  id: string;
 
   @Column()
-  discordId!: string;
+  discordId: string;
 
   @Column()
-  username!: string;
+  username: string;
 
   @Column({ default: 1000 })
-  elo!: number;
+  elo: number;
 
-  @Column()
-  rank!: string;
-
-  @Column({ default: 0 })
-  wins!: number;
+  @Column({ default: 'Bronze' })
+  rank: Rank;
 
   @Column({ default: 0 })
-  losses!: number;
+  wins: number;
+
+  @Column({ default: 0 })
+  losses: number;
 
   @CreateDateColumn()
-  joinedAt!: Date;
+  joinedAt: Date;
 
-  @ManyToOne('League', 'players')
-  league!: any;
+  @Column({ nullable: true })
+  leagueId: string;
+
+  get winRate(): number {
+    const totalGames = this.wins + this.losses;
+    if (totalGames === 0) return 0;
+    return Math.round((this.wins / totalGames) * 100);
+  }
 }

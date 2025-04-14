@@ -1,8 +1,9 @@
+import { Player } from '../entities/Player.js';
+
 export interface ILeague {
   id: string;
   name: string;
   createdAt: Date;
-  players: IPlayer[];
 }
 
 export interface IPlayer {

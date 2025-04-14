@@ -3,12 +3,13 @@ import type { Command } from '../types/commands.js';
 import { leagueCommands } from './league.js';
 import { playerCommands } from './player.js';
 import { helpCommands } from './help.js';
+import { matchCommands } from './match.js';
 
 // Create a collection of commands
 const commands = new Collection<string, Command>();
 
 // Add all commands
-const allCommands = [...leagueCommands, ...playerCommands, ...helpCommands];
+const allCommands = [...leagueCommands, ...playerCommands, ...helpCommands, ...matchCommands];
 for (const command of allCommands) {
   commands.set(command.data.name, command);
 }
