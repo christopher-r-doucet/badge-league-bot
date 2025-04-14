@@ -3,8 +3,10 @@ import { config } from 'dotenv';
 import { commands } from './commands/index.js';
 import { db } from './database/index.js';
 
-// Load environment variables
-config({ path: '.env.local' });
+// Load environment variables from .env.local in development
+if (process.env.NODE_ENV !== 'production') {
+  config({ path: '.env.local' });
+}
 
 const client = new Client({
   intents: [
