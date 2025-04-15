@@ -3,6 +3,7 @@ import { Player } from '../entities/Player.js';
 export interface ILeague {
   id: string;
   name: string;
+  guildId: string;
   createdAt: Date;
 }
 

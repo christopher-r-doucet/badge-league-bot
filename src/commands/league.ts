@@ -5,7 +5,11 @@ import { db } from '../database/index.js';
 // Helper function for league name autocomplete
 async function handleLeagueAutocomplete(interaction: AutocompleteInteraction) {
   const focusedValue = interaction.options.getFocused().toLowerCase();
-  const leagues = await db.getLeagues();
+  const guildId = interaction.guildId || undefined;
+  
+  // Only show leagues for the current guild
+  const leagues = await db.getLeagues(guildId);
+  
   const filtered = leagues
     .filter((league) => league.name.toLowerCase().includes(focusedValue))
     .slice(0, 25) // Discord has a limit of 25 choices
@@ -33,9 +37,15 @@ const createLeagueCommand = {
     if (!interaction.isChatInputCommand()) return;
 
     const name = interaction.options.getString('name', true);
+    const guildId = interaction.guildId;
+    
+    // Ensure the command is used in a guild
+    if (!guildId) {
+      return interaction.editReply({ content: '❌ This command can only be used in a server.' });
+    }
 
     try {
-      const league = await db.createLeague(name);
+      const league = await db.createLeague(name, guildId);
       
       // Create success embed
       const embed = new EmbedBuilder()
@@ -89,9 +99,15 @@ const joinLeagueCommand = {
     if (!interaction.isChatInputCommand()) return;
 
     const leagueName = interaction.options.getString('league', true);
+    const guildId = interaction.guildId;
+    
+    // Ensure the command is used in a guild
+    if (!guildId) {
+      return interaction.editReply({ content: '❌ This command can only be used in a server.' });
+    }
 
     try {
-      const player = await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName);
+      const player = await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName, guildId);
       
       // Create success embed
       const embed = new EmbedBuilder()
@@ -134,7 +150,8 @@ const listLeaguesCommand = {
     if (!interaction.isChatInputCommand()) return;
 
     try {
-      const leagues = await db.getLeagues();
+      const guildId = interaction.guildId || undefined;
+      const leagues = await db.getLeagues(guildId);
 
       if (leagues.length === 0) {
         await interaction.editReply({ content: 'No leagues found. Create one with `/create_league`!' });

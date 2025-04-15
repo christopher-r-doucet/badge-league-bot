@@ -88,20 +88,26 @@ class Database {
     }
   }
 
-  async createLeague(name: string): Promise<League> {
+  async createLeague(name: string, guildId: string): Promise<League> {
     try {
-      console.log('Creating league:', name);
+      console.log('Creating league:', name, 'for guild:', guildId);
       const leagueRepository = this.dataSource.getRepository(League);
       
-      // Check if league already exists
-      const existingLeague = await leagueRepository.findOne({ where: { name } });
+      // Check if league already exists in this guild
+      const existingLeague = await leagueRepository.findOne({ 
+        where: { 
+          name,
+          guildId 
+        } 
+      });
+      
       if (existingLeague) {
-        console.log('League already exists:', existingLeague);
-        throw new Error(`League "${name}" already exists`);
+        console.log('League already exists in this guild:', existingLeague);
+        throw new Error(`League "${name}" already exists in this server`);
       }
 
       // Create new league
-      const league = leagueRepository.create({ name });
+      const league = leagueRepository.create({ name, guildId });
       const savedLeague = await leagueRepository.save(league);
       console.log('Created league:', savedLeague);
       return savedLeague;
@@ -111,15 +117,20 @@ class Database {
     }
   }
 
-  async addPlayerToLeague(discordId: string, username: string, leagueName: string): Promise<Player> {
+  async addPlayerToLeague(discordId: string, username: string, leagueName: string, guildId: string): Promise<Player> {
     try {
       const leagueRepository = this.dataSource.getRepository(League);
       const playerRepository = this.dataSource.getRepository(Player);
       
-      const league = await leagueRepository.findOne({ where: { name: leagueName } });
+      const league = await leagueRepository.findOne({ 
+        where: { 
+          name: leagueName,
+          guildId
+        } 
+      });
       
       if (!league) {
-        throw new Error(`League "${leagueName}" not found`);
+        throw new Error(`League "${leagueName}" not found in this server`);
       }
       
       // Check if player already exists in this league
@@ -148,12 +159,19 @@ class Database {
     }
   }
 
-  async getLeagues(): Promise<League[]> {
+  async getLeagues(guildId?: string): Promise<League[]> {
     try {
-      console.log('Fetching leagues...');
+      console.log('Fetching leagues for guild:', guildId || 'all guilds');
       const leagueRepository = this.dataSource.getRepository(League);
-      const leagues = await leagueRepository.find();
-      console.log('Found leagues:', leagues);
+      
+      // If guildId is provided, filter leagues by guild
+      const whereCondition = guildId ? { guildId } : {};
+      
+      const leagues = await leagueRepository.find({
+        where: whereCondition
+      });
+      
+      console.log(`Found ${leagues.length} leagues`);
       return leagues;
     } catch (error) {
       console.error('Error getting leagues:', error);
@@ -311,7 +329,7 @@ class Database {
   }
 
   // Match-related methods
-  async scheduleMatch(leagueName: string, player1Id: string, player2Id: string, scheduledDate?: Date): Promise<Match> {
+  async scheduleMatch(leagueName: string, player1Id: string, player2Id: string, guildId: string, scheduledDate?: Date): Promise<Match> {
     try {
       const leagueRepository = this.dataSource.getRepository(League);
       const playerRepository = this.dataSource.getRepository(Player);
@@ -319,11 +337,14 @@ class Database {
 
       // Find the league
       const league = await leagueRepository.findOne({ 
-        where: { name: leagueName }
+        where: { 
+          name: leagueName,
+          guildId
+        }
       });
 
       if (!league) {
-        throw new Error(`League "${leagueName}" not found`);
+        throw new Error(`League "${leagueName}" not found in this server`);
       }
 
       // Find player 1
@@ -417,7 +438,7 @@ class Database {
     }
   }
 
-  async getPlayerMatches(discordId: string, status?: MatchStatus): Promise<any[]> {
+  async getPlayerMatches(discordId: string, status?: MatchStatus, guildId?: string): Promise<any[]> {
     try {
       const playerRepository = this.dataSource.getRepository(Player);
       const matchRepository = this.dataSource.getRepository(Match);
@@ -432,7 +453,7 @@ class Database {
         throw new Error('Player not found');
       }
 
-      // Build query conditions
+      // Build query conditions for player
       const conditions: any = [
         { player1Id: player.id },
         { player2Id: player.id }
@@ -455,6 +476,11 @@ class Database {
         const player2 = await playerRepository.findOne({ where: { id: match.player2Id } });
         const league = await leagueRepository.findOne({ where: { id: match.leagueId } });
         
+        // Skip matches that don't belong to the specified guild
+        if (guildId && league && league.guildId !== guildId) {
+          return null;
+        }
+        
         return {
           ...match,
           league,
@@ -463,7 +489,8 @@ class Database {
         };
       }));
 
-      return enrichedMatches;
+      // Filter out null values (matches from other guilds)
+      return enrichedMatches.filter(match => match !== null);
     } catch (error) {
       console.error('Error getting player matches:', error);
       throw error;

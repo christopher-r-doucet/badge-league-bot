@@ -17,7 +17,8 @@
     "test:ranking": "NODE_ENV=development node --import ./register.js test/ranking-system.test.ts",
     "test:match": "NODE_ENV=development node --import ./register.js test/match-system.test.ts",
     "test:elo": "NODE_ENV=development node --import ./register.js test/elo-edge-cases.test.ts",
-    "test": "npm run test:ranking && npm run test:match && npm run test:elo"
+    "test": "npm run test:ranking && npm run test:match && npm run test:elo",
+    "migrate:add-guild-id": "NODE_ENV=development node --import ./register.js src/migrations/add-guild-id.ts"
   },
   "dependencies": {
     "discord.js": "^14.14.1",

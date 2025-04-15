@@ -9,6 +9,9 @@ export class League implements ILeague {
   @Column()
   name!: string;
 
+  @Column({ nullable: true })
+  guildId!: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 }
