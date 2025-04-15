@@ -349,30 +349,29 @@ class Database {
 
       // Find player 1
       const player1 = await playerRepository.findOne({
-        where: { 
-          discordId: player1Id,
-          leagueId: league.id
-        }
+        where: { discordId: player1Id }
       });
 
       if (!player1) {
-        throw new Error('You must be a member of this league to schedule a match');
+        throw new Error('Player 1 not found. You need to join the league first.');
       }
 
       // Find player 2
       const player2 = await playerRepository.findOne({
-        where: { 
-          discordId: player2Id,
-          leagueId: league.id
-        }
+        where: { discordId: player2Id }
       });
 
       if (!player2) {
-        throw new Error('Your opponent must be a member of this league');
+        throw new Error('Player 2 not found. They need to join the league first.');
       }
 
-      if (player1Id === player2Id) {
-        throw new Error('You cannot schedule a match against yourself');
+      // Check if both players are in the same league
+      if (player1.leagueId !== league.id) {
+        throw new Error('You are not a member of this league');
+      }
+
+      if (player2.leagueId !== league.id) {
+        throw new Error('Your opponent is not a member of this league');
       }
 
       // Create the match
