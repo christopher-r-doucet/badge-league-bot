@@ -562,6 +562,16 @@ class Database {
         throw new Error('You are not a participant in this match');
       }
 
+      // Check if both players have confirmed
+      if (match.player1Confirmed && match.player2Confirmed) {
+        console.log(`Match ${matchId} fully confirmed by both players`);
+        
+        // If this is an instant match, it's ready to play immediately
+        if (match.isInstantMatch) {
+          match.scheduledDate = new Date(); // Set to current date/time
+        }
+      }
+
       // Save the match
       const updatedMatch = await matchRepository.save(match);
       return updatedMatch;

@@ -382,12 +382,22 @@ const viewMatchesCommand: Command = {
                 ? '⏳ Waiting for player 1 confirmation'
                 : '⏳ Waiting for both players to confirm';
           
+          // Get match status with confirmation details
+          let matchStatusDisplay = match.status;
+          if (match.status === MatchStatus.SCHEDULED) {
+            if (match.player1Confirmed && match.player2Confirmed) {
+              matchStatusDisplay = 'Ready to play';
+            } else {
+              matchStatusDisplay = 'Waiting for acceptance';
+            }
+          }
+          
           const leagueInfo = `League: ${match.league.name}`;
           const opponentId = interaction.user.id === match.player1Id ? match.player2Id : match.player1Id;
           
           embed.addFields({
             name: `Match #${index + 1}`,
-            value: `**Players**: <@${match.player1Id}> vs <@${match.player2Id}>\n**Status**: ${match.status}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+            value: `**Players**: <@${match.player1.discordId}> vs <@${match.player2.discordId}>\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
             inline: false
           });
         });
@@ -463,12 +473,22 @@ const myMatchesCommand: Command = {
           const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
           const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
           
+          // Get match status with confirmation details
+          let matchStatusDisplay = match.status;
+          if (match.status === MatchStatus.SCHEDULED) {
+            if (match.player1Confirmed && match.player2Confirmed) {
+              matchStatusDisplay = 'Ready to play';
+            } else {
+              matchStatusDisplay = 'Waiting for acceptance';
+            }
+          }
+          
           // Get league name
           const leagueInfo = `League ID: ${match.leagueId}`;
           
           embed.addFields({
             name: `Match #${index + 1}`,
-            value: `**Opponent**: <@${opponentId}>\n**Status**: ${match.status}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+            value: `**Opponent**: <@${opponentId}>\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
             inline: false
           });
         });

@@ -72,8 +72,15 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
             return;
           }
           
+          // Get the guild ID from the interaction
+          const guildId = interaction.guildId;
+          if (!guildId) {
+            await interaction.editReply({ content: 'This command can only be used in a server.' });
+            return;
+          }
+          
           // Add the player to the league
-          await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName);
+          await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName, guildId);
           
           // Create success message
           await interaction.editReply({ 
@@ -191,6 +198,11 @@ async function handleMatchAccept(interaction: ButtonInteraction, matchId: string
     // We need to compare Discord IDs, not database IDs
     if (matchDetails.player1.discordId === interaction.user.id) {
       return interaction.editReply('You cannot accept your own match challenge. The other player must accept it.');
+    }
+    
+    // Check if the match is already fully confirmed
+    if (matchDetails.player1Confirmed && matchDetails.player2Confirmed) {
+      return interaction.editReply('This match has already been accepted and is ready to play!');
     }
     
     // Proceed with match confirmation
