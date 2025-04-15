@@ -26,7 +26,7 @@ async function safeReply(interaction: ChatInputCommandInteraction, content: stri
 const createLeagueCommand = {
   data: new SlashCommandBuilder()
     .setName('create_league')
-    .setDescription('Create a new league')
+    .setDescription('Create a New League')
     .addStringOption(option =>
       option.setName('name')
         .setDescription('The name of the league')
@@ -83,7 +83,7 @@ const createLeagueCommand = {
 const joinLeagueCommand = {
   data: new SlashCommandBuilder()
     .setName('join_league')
-    .setDescription('Join an existing league')
+    .setDescription('Join an Existing League')
     .addStringOption(option =>
       option.setName('league')
         .setDescription('The name of the league')
@@ -145,7 +145,7 @@ const joinLeagueCommand = {
 const listLeaguesCommand = {
   data: new SlashCommandBuilder()
     .setName('list_leagues')
-    .setDescription('List all available leagues'),
+    .setDescription('List All Available Leagues'),
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
 
@@ -204,7 +204,7 @@ const listLeaguesCommand = {
 const leagueStandingsCommand = {
   data: new SlashCommandBuilder()
     .setName('league_standings')
-    .setDescription('Show the standings for a league')
+    .setDescription('Show the League Standings and Rankings')
     .addStringOption(option =>
       option.setName('league')
         .setDescription('The name of the league')
@@ -286,7 +286,7 @@ const leagueStandingsCommand = {
 const inviteToLeagueCommand = {
   data: new SlashCommandBuilder()
     .setName('invite_to_league')
-    .setDescription('Invite a player to join your league')
+    .setDescription('Invite a Player to Join Your League')
     .addStringOption(option =>
       option.setName('league')
         .setDescription('The name of the league')

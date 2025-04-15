@@ -1,8 +1,9 @@
 import { DataSource } from 'typeorm';
-import { MoreThanOrEqual } from 'typeorm';
+import { MoreThanOrEqual, In } from 'typeorm';
 import { League } from '../entities/League.js';
 import { Player } from '../entities/Player.js';
 import { Match, MatchStatus } from '../entities/Match.js';
+import { UserPreference } from '../entities/UserPreference.js';
 import type { Rank } from '../entities/Player.js';
 import path from 'path';
 import fs from 'fs';
@@ -30,7 +31,7 @@ class Database {
             rejectUnauthorized: false
           },
           synchronize: true,
-          entities: [League, Player, Match],
+          entities: [League, Player, Match, UserPreference],
           logging: ['error', 'warn']
         });
         return;
@@ -58,7 +59,7 @@ class Database {
       type: 'sqlite',
       database: dbPath,
       synchronize: true,
-      entities: [League, Player, Match],
+      entities: [League, Player, Match, UserPreference],
       logging: ['error', 'warn']
     });
   }
@@ -149,9 +150,26 @@ class Database {
       const player = new Player();
       player.discordId = discordId;
       player.username = username;
+      player.elo = 1000;
+      player.rank = 'Bronze';
+      player.wins = 0;
+      player.losses = 0;
       player.leagueId = league.id;
+      player.joinedAt = new Date();
       
       const savedPlayer = await playerRepository.save(player);
+      
+      // Check if this is the player's first league
+      const playerCount = await playerRepository.count({
+        where: { discordId }
+      });
+      
+      // If this is their first league or they only have one league, set it as default
+      if (playerCount === 1) {
+        await this.setDefaultLeague(discordId, league.id, guildId);
+        console.log(`Automatically set ${leagueName} as default league for player ${username}`);
+      }
+      
       return savedPlayer;
     } catch (error) {
       console.error('Error adding player to league:', error);
@@ -228,14 +246,48 @@ class Database {
     }
   }
 
-  async getPlayerStats(discordId: string): Promise<Player | null> {
+  async getPlayerStats(discordId: string, leagueName?: string, guildId?: string): Promise<Player | null> {
     try {
-      console.log(`Getting stats for player ${discordId}`);
+      console.log(`Getting stats for player ${discordId}${leagueName ? ` in league ${leagueName}` : ''}`);
       const playerRepository = this.dataSource.getRepository(Player);
+      const leagueRepository = this.dataSource.getRepository(League);
       
+      // If league name is provided, get stats for that specific league
+      if (leagueName) {
+        // Find the league
+        const league = await leagueRepository.findOne({ 
+          where: { 
+            name: leagueName,
+            guildId
+          } 
+        });
+        
+        if (!league) {
+          console.log(`League "${leagueName}" not found`);
+          return null;
+        }
+        
+        // Find the player in this league
+        const player = await playerRepository.findOne({ 
+          where: { 
+            discordId,
+            leagueId: league.id
+          } 
+        });
+        
+        if (!player) {
+          console.log(`Player ${discordId} not found in league "${leagueName}"`);
+          return null;
+        }
+        
+        console.log(`Found stats for player ${discordId} in league "${leagueName}":`, player);
+        return player;
+      }
+      
+      // If no league name is provided, get the player's highest ranked league entry
       const player = await playerRepository.findOne({ 
         where: { discordId },
-        order: { elo: 'DESC' }  // Get their highest ranked league entry
+        order: { elo: 'DESC' }
       });
 
       if (!player) {
@@ -247,6 +299,54 @@ class Database {
       return player;
     } catch (error) {
       console.error('Error getting player stats:', error);
+      throw error;
+    }
+  }
+
+  async getPlayerLeagues(discordId: string, guildId?: string): Promise<League[]> {
+    try {
+      const playerRepository = this.dataSource.getRepository(Player);
+      const leagueRepository = this.dataSource.getRepository(League);
+      
+      // Find all players with this discord ID
+      const players = await playerRepository.find({
+        where: { discordId }
+      });
+      
+      if (players.length === 0) {
+        return [];
+      }
+      
+      // Get all leagues the player is in
+      const leagueIds = players.map(player => player.leagueId);
+      
+      // Build the where clause
+      const whereClause: any = {
+        id: In(leagueIds)
+      };
+      
+      // Add guild filter if provided
+      if (guildId) {
+        whereClause.guildId = guildId;
+      }
+      
+      const leagues = await leagueRepository.find({
+        where: whereClause
+      });
+      
+      return leagues;
+    } catch (error) {
+      console.error('Error getting player leagues:', error);
+      throw error;
+    }
+  }
+
+  async getLeagueById(leagueId: string): Promise<League | null> {
+    try {
+      const leagueRepository = this.dataSource.getRepository(League);
+      return await leagueRepository.findOne({ where: { id: leagueId } });
+    } catch (error) {
+      console.error('Error getting league by ID:', error);
       throw error;
     }
   }
@@ -328,6 +428,91 @@ class Database {
     }
   }
 
+  async getDefaultLeague(discordId: string, guildId?: string): Promise<League | null> {
+    try {
+      const prefRepository = this.dataSource.getRepository(UserPreference);
+      const leagueRepository = this.dataSource.getRepository(League);
+      
+      // Find user preference
+      const whereClause: any = { discordId };
+      if (guildId) {
+        whereClause.guildId = guildId;
+      }
+      
+      const preference = await prefRepository.findOne({
+        where: whereClause
+      });
+      
+      // If preference exists and has a default league
+      if (preference && preference.defaultLeagueId) {
+        const league = await leagueRepository.findOne({
+          where: { id: preference.defaultLeagueId }
+        });
+        
+        if (league) {
+          return league;
+        }
+      }
+      
+      // If no default league is set or it doesn't exist anymore,
+      // return the highest ELO league for the player
+      const playerRepository = this.dataSource.getRepository(Player);
+      const player = await playerRepository.findOne({
+        where: { discordId },
+        order: { elo: 'DESC' }
+      });
+      
+      if (player) {
+        const league = await leagueRepository.findOne({
+          where: { id: player.leagueId }
+        });
+        
+        if (league) {
+          return league;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting default league:', error);
+      throw error;
+    }
+  }
+  
+  async setDefaultLeague(discordId: string, leagueId: string, guildId?: string): Promise<UserPreference> {
+    try {
+      const prefRepository = this.dataSource.getRepository(UserPreference);
+      
+      // Find existing preference
+      const whereClause: any = { discordId };
+      if (guildId) {
+        whereClause.guildId = guildId;
+      }
+      
+      let preference = await prefRepository.findOne({
+        where: whereClause
+      });
+      
+      // Create or update preference
+      if (!preference) {
+        preference = new UserPreference();
+        preference.discordId = discordId;
+        if (guildId) {
+          preference.guildId = guildId;
+        } else {
+          preference.guildId = null as any; // TypeORM will handle this correctly
+        }
+      }
+      
+      preference.defaultLeagueId = leagueId;
+      
+      return await prefRepository.save(preference);
+    } catch (error) {
+      console.error('Error setting default league:', error);
+      throw error;
+    }
+  }
+
   // Match-related methods
   async scheduleMatch(leagueName: string, player1Id: string, player2Id: string, guildId: string, scheduledDate?: Date): Promise<Match> {
     try {
@@ -347,31 +532,28 @@ class Database {
         throw new Error(`League "${leagueName}" not found in this server`);
       }
 
-      // Find player 1
+      // Find player 1 in this specific league
       const player1 = await playerRepository.findOne({
-        where: { discordId: player1Id }
+        where: { 
+          discordId: player1Id,
+          leagueId: league.id
+        }
       });
 
       if (!player1) {
-        throw new Error('Player 1 not found. You need to join the league first.');
+        throw new Error('You are not a member of this league. Please join the league first.');
       }
 
-      // Find player 2
+      // Find player 2 in this specific league
       const player2 = await playerRepository.findOne({
-        where: { discordId: player2Id }
+        where: { 
+          discordId: player2Id,
+          leagueId: league.id
+        }
       });
 
       if (!player2) {
-        throw new Error('Player 2 not found. They need to join the league first.');
-      }
-
-      // Check if both players are in the same league
-      if (player1.leagueId !== league.id) {
-        throw new Error('You are not a member of this league');
-      }
-
-      if (player2.leagueId !== league.id) {
-        throw new Error('Your opponent is not a member of this league');
+        throw new Error('Your opponent is not a member of this league. They need to join the league first.');
       }
 
       // Create the match
@@ -452,22 +634,20 @@ class Database {
         throw new Error('Player not found');
       }
 
-      // Build query conditions for player
-      const conditions: any = [
-        { player1Id: player.id },
-        { player2Id: player.id }
-      ];
-
+      // Build query for matches where the player is either player1 or player2
+      let query = matchRepository.createQueryBuilder('match')
+        .where('match.player1Id = :playerId OR match.player2Id = :playerId', { playerId: player.id });
+      
+      // Add status filter if provided
       if (status) {
-        conditions[0].status = status;
-        conditions[1].status = status;
+        query = query.andWhere('match.status = :status', { status });
       }
-
-      // Find matches
-      const matches = await matchRepository.find({
-        where: conditions,
-        order: { scheduledDate: 'ASC' }
-      });
+      
+      // Order by scheduled date
+      query = query.orderBy('match.scheduledDate', 'ASC');
+      
+      // Execute the query
+      const matches = await query.getMany();
 
       // Enrich matches with player and league data
       const enrichedMatches = await Promise.all(matches.map(async (match) => {

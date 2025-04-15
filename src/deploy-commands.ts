@@ -26,6 +26,7 @@ async function listRegisteredCommands(isGlobal = false) {
             ) as any[];
             console.log(`Found ${globalCommands.length} global commands:`);
             globalCommands.forEach(cmd => console.log(`- ${cmd.name} (ID: ${cmd.id})`));
+            return globalCommands;
         } else if (process.env.GUILD_ID) {
             // Get guild commands
             const guildCommands = await rest.get(
@@ -33,6 +34,7 @@ async function listRegisteredCommands(isGlobal = false) {
             ) as any[];
             console.log(`Found ${guildCommands.length} guild commands:`);
             guildCommands.forEach(cmd => console.log(`- ${cmd.name} (ID: ${cmd.id})`));
+            return guildCommands;
         } else {
             console.error('GUILD_ID is required for listing guild commands');
             process.exit(1);
@@ -46,9 +48,46 @@ async function listRegisteredCommands(isGlobal = false) {
     }
 }
 
-async function deployCommands(isGlobal = false) {
+async function cleanupCommands(isGlobal = false) {
+    try {
+        console.log(`Cleaning up existing ${isGlobal ? 'global' : 'guild'} commands...`);
+        
+        // Get existing commands
+        const existingCommands = await listRegisteredCommands(isGlobal) as any[];
+        
+        // Delete each command
+        for (const cmd of existingCommands) {
+            console.log(`Deleting command: ${cmd.name} (ID: ${cmd.id})`);
+            
+            if (isGlobal) {
+                await rest.delete(
+                    Routes.applicationCommand(process.env.CLIENT_ID!, cmd.id)
+                );
+            } else if (process.env.GUILD_ID) {
+                await rest.delete(
+                    Routes.applicationGuildCommand(process.env.CLIENT_ID!, process.env.GUILD_ID, cmd.id)
+                );
+            }
+        }
+        
+        console.log(`Successfully deleted ${existingCommands.length} commands`);
+    } catch (error) {
+        console.error('Error cleaning up commands:', error);
+        if (error instanceof Error) {
+            console.error('Error details:', error);
+        }
+        process.exit(1);
+    }
+}
+
+async function deployCommands(isGlobal = false, cleanup = false) {
     try {
         console.log(`Started refreshing ${isGlobal ? 'global' : 'guild'} commands...`);
+
+        // Clean up existing commands if requested
+        if (cleanup) {
+            await cleanupCommands(isGlobal);
+        }
 
         // Get command data
         const commandData = Array.from(commands.values()).map(command => command.data.toJSON());
@@ -91,10 +130,13 @@ async function deployCommands(isGlobal = false) {
 const args = process.argv.slice(2);
 const isGlobal = args.includes('--global');
 const listOnly = args.includes('list');
+const cleanup = args.includes('--cleanup');
 
 // If first argument is "list", only list commands, otherwise deploy
 if (listOnly) {
     listRegisteredCommands(isGlobal);
+} else if (args.includes('--clean-only')) {
+    cleanupCommands(isGlobal);
 } else {
-    deployCommands(isGlobal);
+    deployCommands(isGlobal, cleanup);
 }

@@ -27,14 +27,22 @@ async function handleMatchIdAutocomplete(interaction: AutocompleteInteraction) {
   const guildId = interaction.guildId || undefined;
   
   try {
-    // Get all matches for this user using the getPlayerMatches method instead
-    const matches = await db.getPlayerMatches(userId, MatchStatus.SCHEDULED, guildId);
+    // Get all matches for this user (without status filter to include all matches)
+    const matches = await db.getPlayerMatches(userId, undefined, guildId);
+    
+    // Filter to show matches that are ready for reporting results
+    // This includes scheduled matches that are confirmed by both players
+    const readyMatches = matches.filter((match) => 
+      // Only include matches in SCHEDULED status that are confirmed by both players
+      match.status === MatchStatus.SCHEDULED && 
+      match.player1Confirmed && 
+      match.player2Confirmed
+    );
     
     // Filter and format matches for autocomplete
-    const filtered = matches
+    const filtered = readyMatches
       .filter((match) => 
-        match.id.toLowerCase().includes(focusedValue) || 
-        match.status === MatchStatus.SCHEDULED // Only show scheduled matches
+        match.id.toLowerCase().includes(focusedValue)
       )
       .slice(0, 25)
       .map((match) => {
@@ -67,48 +75,27 @@ async function handleMatchIdAutocomplete(interaction: AutocompleteInteraction) {
 const scheduleMatchCommand: Command = {
   data: new SlashCommandBuilder()
     .setName('schedule_match')
-    .setDescription('Schedule a match with another player')
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('scheduled')
-        .setDescription('Schedule a match for a specific date and time')
-        .addUserOption(option => 
-          option.setName('opponent')
-            .setDescription('The player you want to challenge')
-            .setRequired(true)
-        )
-        .addStringOption(option => 
-          option.setName('league')
-            .setDescription('The league to schedule the match in')
-            .setRequired(true)
-            .setAutocomplete(true)
-        )
-        .addStringOption(option => 
-          option.setName('date')
-            .setDescription('Date of the match (YYYY-MM-DD)')
-            .setRequired(true)
-        )
-        .addStringOption(option => 
-          option.setName('time')
-            .setDescription('Time of the match (HH:MM)')
-            .setRequired(false)
-        )
+    .setDescription('Schedule a Match with another player')
+    .addUserOption(option => 
+      option.setName('opponent')
+        .setDescription('The player you want to challenge')
+        .setRequired(true)
     )
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('instant')
-        .setDescription('Schedule an instant match (no date/time required)')
-        .addUserOption(option => 
-          option.setName('opponent')
-            .setDescription('The player you want to challenge')
-            .setRequired(true)
-        )
-        .addStringOption(option => 
-          option.setName('league')
-            .setDescription('The league to schedule the match in')
-            .setRequired(true)
-            .setAutocomplete(true)
-        )
+    .addStringOption(option => 
+      option.setName('league')
+        .setDescription('The league for this match')
+        .setRequired(true)
+        .setAutocomplete(true)
+    )
+    .addStringOption(option => 
+      option.setName('date')
+        .setDescription('Date of the match (YYYY-MM-DD) - leave empty for instant match')
+        .setRequired(false)
+    )
+    .addStringOption(option => 
+      option.setName('time')
+        .setDescription('Time of the match (HH:MM) - not needed for instant matches')
+        .setRequired(false)
     ) as unknown as SlashCommandBuilder,
   
   async autocomplete(interaction: AutocompleteInteraction) {
@@ -122,25 +109,19 @@ const scheduleMatchCommand: Command = {
     try {
       // Don't defer reply here since it's already deferred in index.ts
       
-      const subcommand = interaction.options.getSubcommand();
+      const opponent = interaction.options.getUser('opponent', true);
+      const leagueName = interaction.options.getString('league', true);
+      const dateString = interaction.options.getString('date');
+      const timeString = interaction.options.getString('time');
       
-      if (subcommand === 'scheduled') {
-        const opponent = interaction.options.getUser('opponent', true);
-        const leagueName = interaction.options.getString('league', true);
-        const dateString = interaction.options.getString('date');
-        const timeString = interaction.options.getString('time');
-        
-        if (opponent.id === interaction.user.id) {
-          return interaction.editReply('You cannot challenge yourself to a match. Please select a different opponent.');
-        }
-        
-        let scheduledDate: Date | undefined = undefined;
-        
-        // If not an instant match, validate and parse date/time
-        if (!dateString) {
-          return interaction.editReply('Please provide a date for the match.');
-        }
-        
+      if (opponent.id === interaction.user.id) {
+        return interaction.editReply('You cannot challenge yourself to a match. Please select a different opponent.');
+      }
+      
+      let scheduledDate: Date | undefined = undefined;
+      
+      // If date is provided, validate and parse date/time
+      if (dateString) {
         // Parse date
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         if (!dateRegex.test(dateString)) {
@@ -169,65 +150,31 @@ const scheduleMatchCommand: Command = {
         if (scheduledDate < new Date()) {
           return interaction.editReply('The scheduled date must be in the future.');
         }
+      }
+      
+      // Schedule the match
+      try {
+        const guildId = interaction.guildId;
         
-        // Schedule the match
-        try {
-          const guildId = interaction.guildId;
-          
-          // Ensure the command is used in a guild
-          if (!guildId) {
-            return interaction.editReply('This command can only be used in a server.');
-          }
-          
-          const match = await db.scheduleMatch(
-            leagueName,
-            interaction.user.id,
-            opponent.id,
-            guildId,
-            scheduledDate
-          );
-          
-          // For scheduled matches
-          const enrichedMatch = await db.getMatch(match.id);
-          const dateDisplay = formatDate(scheduledDate as Date);
-          
-          const embed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle('Match Scheduled')
-            .setDescription(`A match has been scheduled between ${interaction.user} and ${opponent}`)
-            .addFields(
-              { name: 'League', value: leagueName, inline: true },
-              { name: 'Date & Time', value: dateDisplay, inline: true }
-            );
-          
-          await interaction.editReply({ embeds: [embed] });
-        } catch (error: any) {
-          await interaction.editReply(`Error scheduling match: ${error.message}`);
-        }
-      } else if (subcommand === 'instant') {
-        const opponent = interaction.options.getUser('opponent', true);
-        const leagueName = interaction.options.getString('league', true);
-        
-        if (opponent.id === interaction.user.id) {
-          return interaction.editReply('You cannot challenge yourself to a match. Please select a different opponent.');
+        // Ensure the command is used in a guild
+        if (!guildId) {
+          return interaction.editReply('This command can only be used in a server.');
         }
         
-        // Schedule the match
-        try {
-          const guildId = interaction.guildId;
-          
-          // Ensure the command is used in a guild
-          if (!guildId) {
-            return interaction.editReply('This command can only be used in a server.');
-          }
-          
-          const match = await db.scheduleMatch(
-            leagueName,
-            interaction.user.id,
-            opponent.id,
-            guildId
-          );
-          
+        const match = await db.scheduleMatch(
+          leagueName,
+          interaction.user.id,
+          opponent.id,
+          guildId,
+          scheduledDate
+        );
+        
+        // For scheduled matches
+        const enrichedMatch = await db.getMatch(match.id);
+        const dateDisplay = scheduledDate ? formatDate(scheduledDate as Date) : 'Instant match';
+        
+        // Different handling for instant vs scheduled matches
+        if (!scheduledDate) {
           // For instant matches, send a confirmation request to the opponent
           const confirmRow = new ActionRowBuilder<ButtonBuilder>()
             .addComponents(
@@ -240,8 +187,6 @@ const scheduleMatchCommand: Command = {
                 .setLabel('Decline')
                 .setStyle(ButtonStyle.Danger)
             );
-          
-          const enrichedMatch = await db.getMatch(match.id);
           
           const embed = new EmbedBuilder()
             .setColor('#0099ff')
@@ -258,17 +203,25 @@ const scheduleMatchCommand: Command = {
             embeds: [embed],
             components: [confirmRow]
           });
-        } catch (error: any) {
-          await interaction.editReply(`Error scheduling match: ${error.message}`);
+        } else {
+          // For scheduled matches
+          const embed = new EmbedBuilder()
+            .setColor('#0099ff')
+            .setTitle('Match Scheduled')
+            .setDescription(`A match has been scheduled between ${interaction.user} and ${opponent}`)
+            .addFields(
+              { name: 'League', value: leagueName, inline: true },
+              { name: 'Date & Time', value: dateDisplay, inline: true }
+            );
+          
+          await interaction.editReply({ embeds: [embed] });
         }
+      } catch (error: any) {
+        await interaction.editReply(`Error scheduling match: ${error.message}`);
       }
     } catch (error: any) {
       console.error('Error in schedule_match command:', error);
-      if (interaction.deferred) {
-        await interaction.editReply('An error occurred while scheduling the match.');
-      } else {
-        await interaction.reply({ content: 'An error occurred while scheduling the match.', ephemeral: true });
-      }
+      await interaction.editReply('An error occurred while scheduling the match.');
     }
   }
 };
@@ -277,7 +230,7 @@ const scheduleMatchCommand: Command = {
 const reportResultCommand: Command = {
   data: new SlashCommandBuilder()
     .setName('report_result')
-    .setDescription('Report the result of a match')
+    .setDescription('Report the Result of a completed match')
     .addStringOption(option => 
       option.setName('match_id')
         .setDescription('ID of the match')
@@ -375,7 +328,7 @@ const reportResultCommand: Command = {
 const viewMatchesCommand: Command = {
   data: new SlashCommandBuilder()
     .setName('view_matches')
-    .setDescription('View all scheduled matches in a league')
+    .setDescription('View All Matches in a league')
     .addStringOption(option => 
       option.setName('league')
         .setDescription('The league to view matches for')
@@ -462,7 +415,13 @@ const viewMatchesCommand: Command = {
 const myMatchesCommand: Command = {
   data: new SlashCommandBuilder()
     .setName('my_matches')
-    .setDescription('View your upcoming matches') as unknown as SlashCommandBuilder,
+    .setDescription('View My Matches (upcoming and completed)')
+    .addStringOption(option => 
+      option.setName('league')
+        .setDescription('The league to view matches for')
+        .setRequired(false)
+        .setAutocomplete(true)
+    ) as unknown as SlashCommandBuilder,
   async execute(interaction: ChatInputCommandInteraction) {
     try {
       // Don't defer reply here since it's already deferred in index.ts
@@ -615,7 +574,7 @@ const myMatchesCommand: Command = {
 const cancelMatchCommand: Command = {
   data: new SlashCommandBuilder()
     .setName('cancel_match')
-    .setDescription('Cancel a scheduled match')
+    .setDescription('Cancel a Match you scheduled')
     .addStringOption(option => 
       option.setName('match_id')
         .setDescription('ID of the match to cancel')

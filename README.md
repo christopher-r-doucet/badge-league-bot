@@ -36,8 +36,17 @@ A Discord bot for organizing and managing competitive leagues with a visual rank
 
 4. **Deploy Commands**
    ```bash
-   npm run deploy-commands
+   # Development (guild-specific commands - updates instantly)
+   npm run deploy-commands:dev
+   
+   # Clean up duplicate commands if needed
+   npm run deploy-commands:cleanup
+   
+   # Production (global commands - may take up to an hour to update)
+   npm run deploy-commands:prod
    ```
+
+   > **Important**: Only use global commands in production. For development, always use guild-specific commands to avoid duplicates and for faster updates.
 
 5. **Run the Bot**
    ```bash

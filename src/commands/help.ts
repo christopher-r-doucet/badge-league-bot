@@ -4,7 +4,7 @@ import type { Command } from '../types/commands.js';
 const helpCommand = {
   data: new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Shows information about the bot and available commands'),
+    .setDescription('Shows Information About the Bot and Available Commands'),
   
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
