@@ -37,6 +37,11 @@ export interface ILeagueService {
    * Delete a league (only if creator or admin, and no active matches)
    */
   deleteLeague(leagueId: string, discordId: string, guildId?: string): Promise<boolean>;
+  
+  /**
+   * Get leagues created by a user
+   */
+  getCreatedLeagues(discordId: string, guildId?: string): Promise<any[]>;
 }
 
 /**
@@ -182,6 +187,24 @@ export class LeagueService implements ILeagueService {
       return true;
     } catch (error) {
       console.error('Error deleting league:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get leagues created by a user
+   */
+  async getCreatedLeagues(discordId: string, guildId?: string): Promise<any[]> {
+    try {
+      // Find all leagues created by this user
+      const leagues = await this.leagueRepository.findBy({
+        creatorId: discordId,
+        ...(guildId ? { guildId } : {})
+      });
+      
+      return leagues;
+    } catch (error) {
+      console.error('Error getting leagues created by user:', error);
       throw error;
     }
   }
