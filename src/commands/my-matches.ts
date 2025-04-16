@@ -113,20 +113,27 @@ const myMatchesCommand = {
       // Always defer reply as ephemeral
       await interaction.deferReply({ ephemeral: true });
       const guildId = interaction.guildId || undefined;
-      
+      // Debug: log user and guild
+      console.log('[my_matches] user:', interaction.user.id, 'guild:', guildId);
       // Use the new database structure
-      const matches = await db.getPlayerMatches(interaction.user.id, undefined, guildId);
-      
+      let matches;
+      try {
+        matches = await db.getPlayerMatches(interaction.user.id, undefined, guildId);
+        console.log('[my_matches] matches returned:', matches);
+      } catch (dbError) {
+        console.error('[my_matches] DB error:', dbError);
+        throw dbError;
+      }
       if (!matches || matches.length === 0) {
         return interaction.editReply({ content: 'You have no matches in this server.' });
       }
-      
       // Only show active/upcoming matches by default
       const activeMatches = matches.filter(match => match.status !== MatchStatus.COMPLETED && match.status !== MatchStatus.CANCELLED);
-      
+      console.log('[my_matches] active matches:', activeMatches);
       // Start at page 0
       await paginateMatches(interaction, activeMatches, 0);
     } catch (error) {
+      console.error('[my_matches] Failed to load matches:', error);
       await interaction.editReply({ content: 'Failed to load matches.' });
     }
   },
