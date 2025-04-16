@@ -272,8 +272,8 @@ const reportResultCommand: Command = {
         }
         
         // Check if user is a participant
-        const isPlayer1 = matchBefore.player1Id === interaction.user.id;
-        const isPlayer2 = matchBefore.player2Id === interaction.user.id;
+        const isPlayer1 = matchBefore.player1.discordId === interaction.user.id;
+        const isPlayer2 = matchBefore.player2.discordId === interaction.user.id;
         
         if (!isPlayer1 && !isPlayer2) {
           return interaction.editReply('You are not a participant in this match.');
