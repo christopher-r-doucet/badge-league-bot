@@ -110,12 +110,13 @@ const myMatchesCommand = {
   
   async execute(interaction: ChatInputCommandInteraction) {
     try {
-      // Always defer reply as ephemeral
-      await interaction.deferReply({ ephemeral: true });
+      // Defensive: Only defer if not already replied/deferred
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true });
+      }
       const guildId = interaction.guildId || undefined;
       // Debug: log user and guild
       console.log('[my_matches] user:', interaction.user.id, 'guild:', guildId);
-      // Use the new database structure
       let matches;
       try {
         matches = await db.getPlayerMatches(interaction.user.id, undefined, guildId);
@@ -127,14 +128,17 @@ const myMatchesCommand = {
       if (!matches || matches.length === 0) {
         return interaction.editReply({ content: 'You have no matches in this server.' });
       }
-      // Only show active/upcoming matches by default
       const activeMatches = matches.filter(match => match.status !== MatchStatus.COMPLETED && match.status !== MatchStatus.CANCELLED);
       console.log('[my_matches] active matches:', activeMatches);
-      // Start at page 0
       await paginateMatches(interaction, activeMatches, 0);
     } catch (error) {
       console.error('[my_matches] Failed to load matches:', error);
-      await interaction.editReply({ content: 'Failed to load matches.' });
+      // Defensive: Only reply if not already replied/deferred
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.reply({ content: 'Failed to load matches.', ephemeral: true });
+      } else {
+        await interaction.editReply({ content: 'Failed to load matches.' });
+      }
     }
   },
 
