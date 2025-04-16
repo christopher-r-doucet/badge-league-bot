@@ -205,16 +205,13 @@ async function handleModalSubmit(interaction: Interaction) {
     try {
       await interaction.deferReply();
       
-      const yourScore = parseInt(interaction.fields.getTextInputValue('your_score'));
-      const opponentScore = parseInt(interaction.fields.getTextInputValue('opponent_score'));
+      const resultValue = interaction.fields.getTextInputValue('match_result').toLowerCase().trim();
       
-      if (isNaN(yourScore) || isNaN(opponentScore) || yourScore < 0 || opponentScore < 0) {
-        return interaction.editReply('Invalid scores. Please enter positive numbers only.');
+      if (resultValue !== 'win' && resultValue !== 'loss') {
+        return interaction.editReply('Invalid result. Please enter either "win" or "loss".');
       }
       
-      if (yourScore === opponentScore) {
-        return interaction.editReply('Scores cannot be equal. There must be a winner.');
-      }
+      const isWin = resultValue === 'win';
       
       // Get match details first to determine player positions
       const matchBefore = await db.getMatch(id);
@@ -224,22 +221,23 @@ async function handleModalSubmit(interaction: Interaction) {
       }
       
       // Check if user is a participant
-      const isPlayer1 = matchBefore.player1Id === interaction.user.id;
-      const isPlayer2 = matchBefore.player2Id === interaction.user.id;
+      const isPlayer1 = matchBefore.player1.discordId === interaction.user.id;
+      const isPlayer2 = matchBefore.player2.discordId === interaction.user.id;
       
       if (!isPlayer1 && !isPlayer2) {
         return interaction.editReply('You are not a participant in this match.');
       }
       
-      // Determine which score belongs to which player
+      // Determine scores based on win/loss
+      // Use a standard score of 1-0 for win/loss
       let player1Score, player2Score;
       
       if (isPlayer1) {
-        player1Score = yourScore;
-        player2Score = opponentScore;
+        player1Score = isWin ? 1 : 0;
+        player2Score = isWin ? 0 : 1;
       } else {
-        player1Score = opponentScore;
-        player2Score = yourScore;
+        player1Score = isWin ? 0 : 1;
+        player2Score = isWin ? 1 : 0;
       }
       
       // Report the result
@@ -254,8 +252,9 @@ async function handleModalSubmit(interaction: Interaction) {
       const enrichedMatch = await db.getMatch(id);
       const winner = player1Score > player2Score ? enrichedMatch.player1 : enrichedMatch.player2;
       const loser = player1Score > player2Score ? enrichedMatch.player2 : enrichedMatch.player1;
-      const winnerScore = player1Score > player2Score ? player1Score : player2Score;
-      const loserScore = player1Score > player2Score ? player2Score : player1Score;
+      
+      // Calculate ELO change - default to a fixed amount for simplicity
+      const eloChange = 25; // Standard ELO change for win/loss
       
       // Create embed
       const embed = new EmbedBuilder()
@@ -263,9 +262,9 @@ async function handleModalSubmit(interaction: Interaction) {
         .setTitle('Match Result Reported')
         .setDescription(`Match in ${enrichedMatch.league.name} has been completed!`)
         .addFields(
-          { name: 'Winner', value: `<@${winner.discordId}> (${winnerScore})`, inline: true },
-          { name: 'Loser', value: `<@${loser.discordId}> (${loserScore})`, inline: true },
-          { name: 'New ELO', value: `${winner.username}: ${winner.elo} (+${winnerScore - loserScore})\n${loser.username}: ${loser.elo} (-${winnerScore - loserScore})`, inline: false }
+          { name: 'Winner', value: `<@${winner.discordId}>`, inline: true },
+          { name: 'Loser', value: `<@${loser.discordId}>`, inline: true },
+          { name: 'New ELO', value: `${winner.username}: ${winner.elo} (+${eloChange})\n${loser.username}: ${loser.elo} (-${eloChange})`, inline: false }
         );
       
       await interaction.editReply({ embeds: [embed] });
@@ -407,32 +406,24 @@ async function handleMatchConfirm(interaction: ButtonInteraction, matchId: strin
 
 async function handleMatchReport(interaction: ButtonInteraction, matchId: string) {
   try {
-    // Create a modal for score reporting
+    // Create a modal for match result reporting
     const modal = new ModalBuilder()
       .setCustomId(`report_match:${matchId}`)
       .setTitle('Report Match Result');
     
-    // Add input fields for scores
-    const yourScoreInput = new TextInputBuilder()
-      .setCustomId('your_score')
-      .setLabel('Your Score')
+    // Add a select component for win/loss
+    const resultInput = new TextInputBuilder()
+      .setCustomId('match_result')
+      .setLabel('Did you win the match?')
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Enter your score')
+      .setPlaceholder('Type "win" or "loss"')
       .setRequired(true);
     
-    const opponentScoreInput = new TextInputBuilder()
-      .setCustomId('opponent_score')
-      .setLabel('Opponent Score')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Enter opponent score')
-      .setRequired(true);
+    // Add input to action row
+    const resultRow = new ActionRowBuilder<TextInputBuilder>().addComponents(resultInput);
     
-    // Add inputs to action rows
-    const yourScoreRow = new ActionRowBuilder<TextInputBuilder>().addComponents(yourScoreInput);
-    const opponentScoreRow = new ActionRowBuilder<TextInputBuilder>().addComponents(opponentScoreInput);
-    
-    // Add action rows to modal
-    modal.addComponents(yourScoreRow, opponentScoreRow);
+    // Add action row to modal
+    modal.addComponents(resultRow);
     
     // Show the modal
     await interaction.showModal(modal);
