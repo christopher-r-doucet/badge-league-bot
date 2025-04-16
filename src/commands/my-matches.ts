@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from '@discordjs/builders';
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ChatInputCommandInteraction, ButtonInteraction } from 'discord.js';
 import { db } from '../database/index.js';
 import { MatchStatus } from '../entities/Match.js';
 import { formatDate } from '../utils/formatters.js';
@@ -8,6 +8,62 @@ import type { Command } from '../types/commands.js';
 /**
  * Command to view a user's matches
  */
+// Helper function for paginating matches
+async function paginateMatches(interaction: ButtonInteraction | ChatInputCommandInteraction, matches: any[], page: number) {
+  const start = page * 5;
+  const end = start + 5;
+  const paginated = matches.slice(start, end);
+  const embed = new EmbedBuilder()
+    .setTitle('Your Matches')
+    .setDescription(`Page ${page + 1} of ${Math.ceil(matches.length / 5)}`);
+  paginated.forEach((match, i) => {
+    try {
+      if (!match) return; // Skip if match is undefined
+      
+      // Safely determine opponent
+      const isPlayer1 = match.player1 && match.player1.discordId === interaction.user.id;
+      const opponent = isPlayer1 ? match.player2 : match.player1;
+      const opponentName = opponent && opponent.username ? opponent.username : 'Unknown player';
+
+      // Format date
+      const dateInfo = match.scheduledDate 
+        ? formatDate(match.scheduledDate) 
+        : 'Instant match (no scheduled date)';
+
+      // Confirmation status
+      const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
+      const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
+      const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
+
+      // Get match status with confirmation details
+      let matchStatusDisplay = match.status;
+      if (match.status === MatchStatus.SCHEDULED) {
+        if (match.player1Confirmed === true && match.player2Confirmed === true) {
+          matchStatusDisplay = 'Ready to play';
+        } else {
+          matchStatusDisplay = 'Waiting for acceptance';
+        }
+      }
+
+      // Get league name
+      const leagueInfo = match.league ? `League: ${match.league.name}` : `League ID: ${match.leagueId}`;
+
+      embed.addFields({
+        name: `Match #${start + i + 1}`,
+        value: `**Opponent**: ${opponentName}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+        inline: false
+      });
+    } catch (error) {
+      console.error(`Error processing match:`, error);
+      // Skip this match if there's an error
+    }
+  });
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  if (page > 0) row.addComponents(new ButtonBuilder().setCustomId('prev_page').setLabel('Previous').setStyle(ButtonStyle.Secondary));
+  if (end < matches.length) row.addComponents(new ButtonBuilder().setCustomId('next_page').setLabel('Next').setStyle(ButtonStyle.Secondary));
+  await interaction.editReply({ embeds: [embed], components: row.components.length ? [row] : [] });
+}
+
 const myMatchesCommand: Command = {
   data: new SlashCommandBuilder()
     .setName('my_matches')
@@ -32,166 +88,26 @@ const myMatchesCommand: Command = {
         return interaction.editReply('You have no matches in this server.');
       }
       
-      // Filter matches by status
-      const scheduledMatches = matches.filter(match => match && match.status === MatchStatus.SCHEDULED);
-      const completedMatches = matches.filter(match => match && match.status === MatchStatus.COMPLETED);
+      // Only show active/upcoming matches by default
+      const activeMatches = matches.filter(match => match.status !== MatchStatus.COMPLETED && match.status !== MatchStatus.CANCELLED);
       
-      if (scheduledMatches.length === 0 && completedMatches.length === 0) {
-        return interaction.editReply('You have no matches.');
-      }
-      
-      // Create embed
-      const embed = new EmbedBuilder()
-        .setColor(0x0099FF)
-        .setTitle('Your Matches')
-        .setDescription(`You have ${scheduledMatches.length} scheduled and ${completedMatches.length} completed matches.`)
-        .setTimestamp()
-        .setFooter({ text: 'Badge League Bot' });
-      
-      // Add scheduled matches
-      if (scheduledMatches.length > 0) {
-        embed.addFields({
-          name: '📅 Upcoming Matches',
-          value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-          inline: false
-        });
-        
-        // Add each scheduled match
-        scheduledMatches.forEach((match, index) => {
-          try {
-            if (!match) return; // Skip if match is undefined
-            
-            // Safely determine opponent
-            const isPlayer1 = match.player1 && match.player1.discordId === interaction.user.id;
-            const opponent = isPlayer1 ? match.player2 : match.player1;
-            const opponentName = opponent && opponent.username ? opponent.username : 'Unknown player';
-
-            // Format date
-            const dateInfo = match.scheduledDate 
-              ? formatDate(match.scheduledDate) 
-              : 'Instant match (no scheduled date)';
-
-            // Confirmation status
-            const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
-            const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
-            const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
-
-            // Get match status with confirmation details
-            let matchStatusDisplay = match.status;
-            if (match.status === MatchStatus.SCHEDULED) {
-              if (match.player1Confirmed && match.player2Confirmed) {
-                matchStatusDisplay = 'Ready to play';
-              } else {
-                matchStatusDisplay = 'Waiting for acceptance';
-              }
-            }
-
-            // Get league name
-            const leagueInfo = match.league ? `League: ${match.league.name}` : `League ID: ${match.leagueId}`;
-
-            embed.addFields({
-              name: `Match #${index + 1}`,
-              value: `**Opponent**: ${opponentName}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
-              inline: false
-            });
-          } catch (error) {
-            console.error(`Error processing match:`, error);
-            // Skip this match if there's an error
-          }
-        });
-      }
-      
-      // Add completed matches
-      if (completedMatches.length > 0) {
-        embed.addFields({
-          name: '🏆 Completed Matches',
-          value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-          inline: false
-        });
-        
-        // Add each completed match (up to 5 most recent)
-        completedMatches
-          .sort((a, b) => new Date(b.completedDate || 0).getTime() - new Date(a.completedDate || 0).getTime())
-          .slice(0, 5)
-          .forEach((match, index) => {
-            try {
-              if (!match) return; // Skip if match is undefined
-              
-              // Safely determine opponent and result
-              const isPlayer1 = match.player1 && match.player1.discordId === interaction.user.id;
-              const opponent = isPlayer1 ? match.player2 : match.player1;
-              const opponentName = opponent && opponent.username ? opponent.username : 'Unknown player';
-              const didWin = (isPlayer1 && match.winnerId === match.player1Id) || (!isPlayer1 && match.winnerId === match.player2Id);
-
-              // Format completion date
-              const dateInfo = match.completedDate 
-                ? formatDate(match.completedDate) 
-                : 'Unknown date';
-
-              // Get league name
-              const leagueInfo = match.league ? `League: ${match.league.name}` : `League ID: ${match.leagueId}`;
-
-              embed.addFields({
-                name: `Match #${index + 1}`,
-                value: `**Opponent**: ${opponentName}\n**Result**: ${didWin ? '🏆 Win' : '❌ Loss'}\n**Date**: ${dateInfo}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
-                inline: false
-              });
-            } catch (error) {
-              console.error(`Error processing completed match:`, error);
-              // Skip this match if there's an error
-            }
-          });
-      }
-      
-      // Add action buttons for the first match
-      if (scheduledMatches.length > 0) {
-        const firstMatch = scheduledMatches[0];
-        
-        if (firstMatch) { // Check if firstMatch exists
-          const actionRow = new ActionRowBuilder<ButtonBuilder>();
-          
-          // Only add confirm button if the player hasn't confirmed yet
-          const isPlayer1 = firstMatch.player1 && firstMatch.player1.discordId === interaction.user.id;
-          const hasConfirmed = isPlayer1 ? firstMatch.player1Confirmed : firstMatch.player2Confirmed;
-          
-          if (!hasConfirmed) {
-            actionRow.addComponents(
-              new ButtonBuilder()
-                .setCustomId(`match_confirm:${firstMatch.id}`)
-                .setLabel('Confirm Match')
-                .setStyle(ButtonStyle.Success)
-            );
-          }
-          
-          // Add report and cancel buttons
-          actionRow.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`match_report:${firstMatch.id}`)
-              .setLabel('Report Result')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId(`match_cancel:${firstMatch.id}`)
-              .setLabel('Cancel Match')
-              .setStyle(ButtonStyle.Danger)
-          );
-          
-          // Only add components if we have any buttons
-          const replyOptions: any = { embeds: [embed] };
-          if (actionRow.components.length > 0) {
-            replyOptions.components = [actionRow];
-          }
-          
-          await interaction.editReply(replyOptions);
-        } else {
-          await interaction.editReply({ embeds: [embed] });
-        }
-      } else {
-        await interaction.editReply({ embeds: [embed] });
-      }
-    } catch (error: any) {
-      console.error('Error in my_matches command:', error);
-      await interaction.editReply(`Error viewing your matches: ${error.message}`);
+      // Start at page 0
+      await paginateMatches(interaction, activeMatches, 0);
+    } catch (error) {
+      await interaction.editReply('Failed to load matches.');
     }
+  },
+
+  handleComponent: async function(interaction: ButtonInteraction) {
+    if (!interaction.isButton()) return;
+    const guildId = interaction.guildId || undefined;
+    const matches = await db.getPlayerMatches(interaction.user.id, undefined, guildId);
+    const activeMatches = matches.filter(match => match.status !== MatchStatus.COMPLETED && match.status !== MatchStatus.CANCELLED);
+    let page = Number(interaction.message.embeds[0]?.description?.match(/Page (\d+)/)?.[1] || 1) - 1;
+    if (interaction.customId === 'next_page') page++;
+    if (interaction.customId === 'prev_page') page--;
+    await paginateMatches(interaction, activeMatches, page);
+    await interaction.deferUpdate();
   }
 };
 

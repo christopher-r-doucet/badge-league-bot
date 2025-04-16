@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import { commands } from './commands/index.js';
 import { db } from './database/index.js';
 import { formatDate } from './utils/formatters.js';
+import myMatchesCommand from './commands/my-matches.js';
 
 // Load environment variables only in non-production environments
 if (process.env.NODE_ENV !== 'production') {
@@ -99,7 +100,13 @@ async function handleSlashCommand(interaction: ChatInputCommandInteraction) {
 async function handleButtonInteraction(interaction: ButtonInteraction) {
   console.log(`Processing button interaction: ${interaction.customId}`);
   const customId = interaction.customId;
-  
+
+  // Pagination for my_matches
+  if (['next_page', 'prev_page'].includes(customId)) {
+    await myMatchesCommand.handleComponent(interaction);
+    return;
+  }
+
   try {
     // Handle match-related buttons
     if (customId.startsWith('match_accept:')) {

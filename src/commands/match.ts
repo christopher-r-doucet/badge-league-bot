@@ -28,47 +28,21 @@ async function handleMatchIdAutocomplete(interaction: AutocompleteInteraction) {
   
   try {
     console.log(`Autocomplete request for match_id from user ${userId} in guild ${guildId || 'DM'}`);
-    
-    // Get all matches for this user (without status filter to include all matches)
+    // Get all matches for this user
     const matches = await db.getPlayerMatches(userId, undefined, guildId);
-    
-    console.log(`Retrieved ${matches.length} total matches for user ${userId}`);
-    
-    // Log details of each match for debugging
-    matches.forEach((match, index) => {
-      console.log(`Match ${index + 1}: ID=${match.id}, Status=${match.status}, Player1Confirmed=${match.player1Confirmed}, Player2Confirmed=${match.player2Confirmed}`);
-    });
-    
-    // For testing purposes, show all matches regardless of status
-    const readyMatches = matches;
-    
-    console.log(`Using ${readyMatches.length} matches for autocomplete (all matches for testing)`);
-    
-    // Filter and format matches for autocomplete
-    const filtered = readyMatches
-      .filter((match) => 
-        match.id.toLowerCase().includes(focusedValue)
-      )
+    // Only show matches that are not completed or cancelled
+    const filtered = matches
+      .filter(match => match && match.status !== MatchStatus.COMPLETED && match.status !== MatchStatus.CANCELLED)
+      .filter(match => match.id && match.id.toLowerCase().includes(focusedValue))
       .slice(0, 25)
-      .map((match) => {
-        // Create a descriptive label
-        const isPlayer1 = match.player1 && match.player1.discordId === userId;
-        const opponent = isPlayer1 ? match.player2 : match.player1;
-        const opponentName = opponent && opponent.username ? opponent.username : 'Unknown player';
-        
-        const matchDate = match.scheduledDate ? 
-          new Date(match.scheduledDate).toLocaleDateString() : 
-          'Instant match';
-        
-        // Use a shorter ID format for display
+      .map(match => {
+        const opponentName = match.opponentUsername || 'Unknown player';
         const shortId = match.id.substring(0, 8);
-        
         return {
           name: `Match vs ${opponentName} - ID: ${shortId} (${match.status})`,
           value: match.id
         };
       });
-    
     console.log(`Returning ${filtered.length} matches for autocomplete`);
     await interaction.respond(filtered);
   } catch (error) {
