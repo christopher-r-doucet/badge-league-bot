@@ -101,8 +101,9 @@ const myMatchesCommand = {
         .setDescription('The league to view matches for')
         .setRequired(false)
         .setAutocomplete(true)
-    ),
+    ) as unknown as SlashCommandBuilder,
   deploymentType: 'global',
+  
   async execute(interaction: ChatInputCommandInteraction) {
     try {
       // Always defer reply as ephemeral
@@ -155,7 +156,7 @@ const myMatchesCommand = {
     } catch (error) {
       await interaction.reply({ content: 'Failed to cancel match.', ephemeral: true });
     }
-  },
+  }
 } as Command;
 
 export default myMatchesCommand;

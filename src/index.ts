@@ -113,8 +113,8 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
   if (customId.startsWith('cancel_match:')) {
     const matchId = customId.split(':')[1];
     // Call a cancel handler in myMatchesCommand if it exists, otherwise handle here
-    if (myMatchesCommand && typeof myMatchesCommand.cancelMatch === 'function') {
-      await myMatchesCommand.cancelMatch(interaction, matchId);
+    if (myMatchesCommand && typeof (myMatchesCommand as any).cancelMatch === 'function') {
+      await (myMatchesCommand as any).cancelMatch(interaction, matchId);
     } else {
       // Fallback: cancel match and update UI
       try {
