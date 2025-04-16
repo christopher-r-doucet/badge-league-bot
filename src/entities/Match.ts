@@ -42,10 +42,10 @@ export class Match {
   @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ nullable: true, type: 'datetime' })
+  @Column({ nullable: true, type: 'timestamp' })
   scheduledDate: Date | null;
 
-  @Column({ nullable: true, type: 'datetime' })
+  @Column({ nullable: true, type: 'timestamp' })
   completedDate: Date;
 
   @Column({ default: false })
