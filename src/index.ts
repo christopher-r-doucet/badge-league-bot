@@ -67,10 +67,14 @@ async function handleSlashCommand(interaction: ChatInputCommandInteraction) {
   // Log command execution
   console.log(`Executing command: ${interaction.commandName} ${command?.deploymentType === 'global' ? '(GLOBAL)' : '(guild command)'} for user: ${interaction.user.username}`);
   
+  // Determine if this command should use ephemeral replies
+  const ephemeralCommands = ['my_matches_guild', 'status'];
+  const shouldBeEphemeral = ephemeralCommands.includes(interaction.commandName);
+  
   // Defer reply to give us time to process
   try {
     if (!interaction.deferred && !interaction.replied) {
-      await interaction.deferReply();
+      await interaction.deferReply({ ephemeral: shouldBeEphemeral });
     }
   } catch (error) {
     console.error('Error deferring reply:', error);

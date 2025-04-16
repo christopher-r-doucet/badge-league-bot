@@ -7,7 +7,13 @@ import myMatchesCommand from './my-matches.js';
 // Create a collection of commands
 const commands = new Collection();
 // Add all commands
-const allCommands = [...leagueCommands, ...playerCommands, ...helpCommands, ...matchCommands, myMatchesCommand];
+const allCommands = [
+    ...leagueCommands,
+    ...playerCommands,
+    ...helpCommands,
+    ...matchCommands,
+    myMatchesCommand
+];
 for (const command of allCommands) {
     commands.set(command.data.name, command);
 }
