@@ -336,17 +336,28 @@ const reportResultCommand: Command = {
           const player1Name = matchBefore.player1?.username || 'Player 1';
           const player2Name = matchBefore.player2?.username || 'Player 2';
           
-          // Format ELO changes with colors and emojis
-          const player1EloNew = (matchBefore.player1?.elo || 0) + match.player1EloChange;
-          const player2EloNew = (matchBefore.player2?.elo || 0) + match.player2EloChange;
-          
-          const player1ChangeText = match.player1EloChange > 0 
-            ? `📈 ${player1Name}: ${player1EloNew}(+${match.player1EloChange})` 
-            : `📉 ${player1Name}: ${player1EloNew}(${match.player1EloChange})`;
+          // Get the actual ELO values after the match
+          const player1EloNew = player1Name === matchBefore.player1?.username 
+            ? match.player1EloBefore + match.player1EloChange 
+            : match.player1EloBefore;
             
-          const player2ChangeText = match.player2EloChange > 0 
-            ? `📈 ${player2Name}: ${player2EloNew}(+${match.player2EloChange})` 
-            : `📉 ${player2Name}: ${player2EloNew}(${match.player2EloChange})`;
+          const player2EloNew = player2Name === matchBefore.player2?.username 
+            ? match.player2EloBefore + match.player2EloChange 
+            : match.player2EloBefore;
+          
+          // Determine which player won to correctly display ELO changes
+          const winnerId = match.winnerId;
+          const player1Won = winnerId === matchBefore.player1Id;
+          const player2Won = winnerId === matchBefore.player2Id;
+          
+          // Format ELO changes correctly based on who won
+          const player1ChangeText = player1Won
+            ? `📈 ${player1Name}: ${player1EloNew}(+${Math.abs(match.player1EloChange)})` 
+            : `📉 ${player1Name}: ${player1EloNew}(-${Math.abs(match.player1EloChange)})`;
+            
+          const player2ChangeText = player2Won
+            ? `📈 ${player2Name}: ${player2EloNew}(+${Math.abs(match.player2EloChange)})` 
+            : `📉 ${player2Name}: ${player2EloNew}(-${Math.abs(match.player2EloChange)})`;
           
           embed.addFields({
             name: 'New ELO',
