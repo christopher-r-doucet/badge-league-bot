@@ -117,117 +117,126 @@ const scheduleMatchCommand: Command = {
       
       const opponent = interaction.options.getUser('opponent', true);
       const leagueName = interaction.options.getString('league', true);
-      const dateString = interaction.options.getString('date');
-      const timeString = interaction.options.getString('time');
+      const dateStr = interaction.options.getString('date');
+      const timeStr = interaction.options.getString('time');
+      const guildId = interaction.guildId;
       
-      if (opponent.id === interaction.user.id) {
-        return interaction.editReply('You cannot challenge yourself to a match. Please select a different opponent.');
+      // Validate that we're in a guild
+      if (!guildId) {
+        return interaction.editReply('This command can only be used in a server.');
       }
       
-      let scheduledDate: Date | undefined = undefined;
+      // Check that the opponent is not the same as the player
+      if (opponent.id === interaction.user.id) {
+        return interaction.editReply('You cannot schedule a match against yourself.');
+      }
       
-      // If date is provided, validate and parse date/time
-      if (dateString) {
-        // Parse date
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!dateRegex.test(dateString)) {
+      // Parse date and time if provided
+      let matchDate: Date | undefined = undefined;
+      
+      if (dateStr) {
+        // If date is provided, validate it
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
           return interaction.editReply('Invalid date format. Please use YYYY-MM-DD.');
         }
         
-        // Parse time if provided
-        let timeHours = 12;
-        let timeMinutes = 0;
-        
-        if (timeString) {
-          const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
-          if (!timeRegex.test(timeString)) {
-            return interaction.editReply('Invalid time format. Please use HH:MM (24-hour format).');
+        // If time is also provided, combine them
+        if (timeStr) {
+          if (!/^\d{1,2}:\d{2}$/.test(timeStr)) {
+            return interaction.editReply('Invalid time format. Please use HH:MM.');
           }
           
-          const [hours, minutes] = timeString.split(':').map(Number);
-          timeHours = hours;
-          timeMinutes = minutes;
+          matchDate = new Date(`${dateStr}T${timeStr}`);
+        } else {
+          // If only date is provided, use noon as default time
+          matchDate = new Date(`${dateStr}T12:00`);
         }
         
-        // Create date object
-        scheduledDate = new Date(`${dateString}T${timeHours.toString().padStart(2, '0')}:${timeMinutes.toString().padStart(2, '0')}:00`);
-        
-        // Validate date is in the future
-        if (scheduledDate < new Date()) {
-          return interaction.editReply('The scheduled date must be in the future.');
+        // Validate that the date is in the future
+        if (matchDate < new Date()) {
+          return interaction.editReply('Match date must be in the future.');
         }
       }
       
-      // Schedule the match
       try {
-        const guildId = interaction.guildId;
-        
-        // Ensure the command is used in a guild
-        if (!guildId) {
-          return interaction.editReply('This command can only be used in a server.');
-        }
-        
+        // Schedule the match
         const match = await db.scheduleMatch(
           leagueName,
           interaction.user.id,
           opponent.id,
           guildId,
-          scheduledDate
+          matchDate
         );
         
-        // For scheduled matches
+        // Get the enriched match with player and league details
         const enrichedMatch = await db.getMatch(match.id);
-        const dateDisplay = scheduledDate ? formatDate(scheduledDate as Date) : 'Instant match';
         
-        // Different handling for instant vs scheduled matches
-        if (!scheduledDate) {
-          // For instant matches, send a confirmation request to the opponent
-          const confirmRow = new ActionRowBuilder<ButtonBuilder>()
-            .addComponents(
-              new ButtonBuilder()
-                .setCustomId(`match_accept:${match.id}`)
-                .setLabel('Accept Challenge')
-                .setStyle(ButtonStyle.Success),
-              new ButtonBuilder()
-                .setCustomId(`match_decline:${match.id}`)
-                .setLabel('Decline')
-                .setStyle(ButtonStyle.Danger)
-            );
-          
-          const embed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle('Match Challenge')
-            .setDescription(`${interaction.user} has challenged ${opponent} to a match in ${leagueName}!`)
-            .addFields(
-              { name: 'League', value: leagueName, inline: true },
-              { name: 'Type', value: 'Instant Match', inline: true }
-            )
-            .setFooter({ text: 'This challenge will expire in 24 hours if not accepted.' });
-          
-          await interaction.editReply({ 
-            content: `${opponent}, you've been challenged to a match!`,
-            embeds: [embed],
-            components: [confirmRow]
+        if (!enrichedMatch) {
+          return interaction.editReply('Failed to retrieve match details after scheduling.');
+        }
+        
+        // Create confirmation buttons
+        const confirmButton = new ButtonBuilder()
+          .setCustomId(`match_confirm:${match.id}`)
+          .setLabel('Confirm Match')
+          .setStyle(ButtonStyle.Success);
+        
+        const cancelButton = new ButtonBuilder()
+          .setCustomId(`match_cancel:${match.id}`)
+          .setLabel('Cancel Match')
+          .setStyle(ButtonStyle.Danger);
+        
+        const row = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(confirmButton, cancelButton);
+        
+        // Create embed
+        const embed = new EmbedBuilder()
+          .setColor('#0099ff')
+          .setTitle('Match Scheduled')
+          .setDescription(`A match has been scheduled between <@${interaction.user.id}> and <@${opponent.id}>.`)
+          .addFields(
+            { name: 'League', value: enrichedMatch.league?.name || 'Unknown League', inline: true },
+            { name: 'Status', value: 'Waiting for confirmation', inline: true },
+            { name: 'Match ID', value: match.id.substring(0, 8) + '...', inline: true }
+          );
+        
+        // Add date field if scheduled
+        if (matchDate) {
+          embed.addFields({ 
+            name: 'Scheduled For', 
+            value: formatDate(matchDate), 
+            inline: false 
           });
         } else {
-          // For scheduled matches
-          const embed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle('Match Scheduled')
-            .setDescription(`A match has been scheduled between ${interaction.user} and ${opponent}`)
-            .addFields(
-              { name: 'League', value: leagueName, inline: true },
-              { name: 'Date & Time', value: dateDisplay, inline: true }
-            );
-          
-          await interaction.editReply({ embeds: [embed] });
+          embed.addFields({ 
+            name: 'Scheduled For', 
+            value: 'Instant match (play now)', 
+            inline: false 
+          });
         }
+        
+        // Add confirmation status
+        embed.addFields({ 
+          name: 'Confirmation Status', 
+          value: `<@${interaction.user.id}>: ✅ (Scheduler)\n<@${opponent.id}>: ❌ (Waiting)`, 
+          inline: false 
+        });
+        
+        await interaction.editReply({ 
+          content: `<@${opponent.id}> - You've been challenged to a match!`,
+          embeds: [embed], 
+          components: [row] 
+        });
       } catch (error: any) {
         await interaction.editReply(`Error scheduling match: ${error.message}`);
       }
     } catch (error: any) {
       console.error('Error in schedule_match command:', error);
-      await interaction.editReply('An error occurred while scheduling the match.');
+      if (interaction.deferred) {
+        await interaction.editReply('An error occurred while scheduling the match.');
+      } else {
+        await interaction.reply({ content: 'An error occurred while scheduling the match.', ephemeral: true });
+      }
     }
   }
 };
@@ -264,69 +273,75 @@ const reportResultCommand: Command = {
       const didWin = interaction.options.getBoolean('did_you_win', true);
       
       try {
-        // Get match details first to determine player positions
+        // Get match details before updating
         const matchBefore = await db.getMatch(matchId);
         
         if (!matchBefore) {
           return interaction.editReply('Match not found.');
         }
         
-        // Check if user is a participant
-        const isPlayer1 = matchBefore.player1 && matchBefore.player1.discordId === interaction.user.id;
-        const isPlayer2 = matchBefore.player2 && matchBefore.player2.discordId === interaction.user.id;
+        // Check if the user is a participant in the match
+        const isPlayer1 = matchBefore.player1?.discordId === interaction.user.id;
+        const isPlayer2 = matchBefore.player2?.discordId === interaction.user.id;
         
         if (!isPlayer1 && !isPlayer2) {
           return interaction.editReply('You are not a participant in this match.');
         }
         
-        // Determine which score belongs to which player
-        // Winner gets 1, loser gets 0
-        let player1Score, player2Score;
+        // Determine winner ID based on who reported and if they won
+        const winnerId = didWin ? interaction.user.id : 
+                        (isPlayer1 ? matchBefore.player2?.discordId : matchBefore.player1?.discordId);
         
-        if (isPlayer1) {
-          player1Score = didWin ? 1 : 0;
-          player2Score = didWin ? 0 : 1;
+        // Determine scores (1 for winner, 0 for loser)
+        let player1Score = 0;
+        let player2Score = 0;
+        
+        if ((isPlayer1 && didWin) || (isPlayer2 && !didWin)) {
+          player1Score = 1;
+          player2Score = 0;
         } else {
-          player1Score = didWin ? 0 : 1;
-          player2Score = didWin ? 1 : 0;
+          player1Score = 0;
+          player2Score = 1;
         }
         
         // Report the result
-        const updatedMatch = await db.reportMatchResult(
-          matchId,
-          interaction.user.id,
-          player1Score,
-          player2Score
-        );
+        await db.reportMatchResult(matchId, interaction.user.id, player1Score, player2Score);
         
-        // Get enriched match with player details
+        // Get updated match details
         const enrichedMatch = await db.getMatch(matchId);
         
-        // Safely determine winner and loser player objects
-        const winnerPlayer = didWin ? 
-          (isPlayer1 ? enrichedMatch.player1 : enrichedMatch.player2) : 
-          (isPlayer1 ? enrichedMatch.player2 : enrichedMatch.player1);
-        
-        const loserPlayer = didWin ? 
-          (isPlayer1 ? enrichedMatch.player2 : enrichedMatch.player1) : 
-          (isPlayer1 ? enrichedMatch.player1 : enrichedMatch.player2);
-        
-        // Ensure we have valid player data
-        const winnerName = winnerPlayer && winnerPlayer.username ? winnerPlayer.username : 'Unknown player';
-        const loserName = loserPlayer && loserPlayer.username ? loserPlayer.username : 'Unknown player';
-        const winnerElo = winnerPlayer && typeof winnerPlayer.elo === 'number' ? winnerPlayer.elo : 'N/A';
-        const loserElo = loserPlayer && typeof loserPlayer.elo === 'number' ? loserPlayer.elo : 'N/A';
+        if (!enrichedMatch) {
+          return interaction.editReply('Failed to retrieve match details after reporting result.');
+        }
         
         // Create embed
         const embed = new EmbedBuilder()
           .setColor('#00ff00')
           .setTitle('Match Result Reported')
-          .setDescription(`Match in ${enrichedMatch.league ? enrichedMatch.league.name : 'Unknown league'} has been completed!`)
+          .setDescription(`The result for match ID \`${matchId.substring(0, 8)}...\` has been recorded.`)
           .addFields(
-            { name: 'Winner', value: `${winnerName}`, inline: true },
-            { name: 'Loser', value: `${loserName}`, inline: true },
-            { name: 'New ELO', value: `${winnerName}: ${winnerElo}\n${loserName}: ${loserElo}`, inline: false }
+            { name: 'Winner', value: `<@${winnerId}>`, inline: true },
+            { name: 'League', value: enrichedMatch.league?.name || 'Unknown League', inline: true },
+            { name: 'Reported By', value: `<@${interaction.user.id}>`, inline: true }
           );
+        
+        // Add player fields
+        if (enrichedMatch.player1 && enrichedMatch.player2) {
+          embed.addFields(
+            { name: 'Player 1', value: `<@${enrichedMatch.player1.discordId}>`, inline: true },
+            { name: 'Player 2', value: `<@${enrichedMatch.player2.discordId}>`, inline: true },
+            { name: '\u200B', value: '\u200B', inline: true } // Empty field for alignment
+          );
+        }
+        
+        // Add completion date
+        if (enrichedMatch.completedDate) {
+          embed.addFields({ 
+            name: 'Completed', 
+            value: formatDate(enrichedMatch.completedDate), 
+            inline: false 
+          });
+        }
         
         await interaction.editReply({ embeds: [embed] });
       } catch (error: any) {
@@ -367,50 +382,50 @@ const viewMatchesCommand: Command = {
       // Don't defer reply here since it's already deferred in index.ts
       
       const leagueName = interaction.options.getString('league', true);
+      const guildId = interaction.guildId;
+      
+      // Validate that we're in a guild
+      if (!guildId) {
+        return interaction.editReply('This command can only be used in a server.');
+      }
       
       try {
+        // Get league first to validate it exists
+        const league = await db.getLeague(leagueName, guildId);
+        
+        if (!league) {
+          return interaction.editReply(`League "${leagueName}" not found.`);
+        }
+        
+        // Get scheduled matches for the league
         const matches = await db.getScheduledMatches(leagueName);
         
         if (matches.length === 0) {
-          return interaction.editReply(`No scheduled matches found in ${leagueName}.`);
+          return interaction.editReply(`No scheduled matches found in league "${leagueName}".`);
         }
         
         // Create embed
         const embed = new EmbedBuilder()
           .setColor('#0099ff')
           .setTitle(`Scheduled Matches - ${leagueName}`)
-          .setDescription('Here are all the scheduled matches:');
+          .setDescription(`There are ${matches.length} scheduled matches in this league.`)
+          .setTimestamp()
+          .setFooter({ text: 'Badge League Bot' });
         
-        // Add fields for each match
-        matches.forEach((match, index) => {
+        // Add each match to the embed (up to 10)
+        matches.slice(0, 10).forEach((match, index) => {
+          const player1Name = match.player1?.username || 'Unknown Player';
+          const player2Name = match.player2?.username || 'Unknown Player';
+          
           const dateInfo = match.scheduledDate 
-            ? `Scheduled for ${formatDate(new Date(match.scheduledDate))}` 
-            : 'Instant match (waiting for acceptance)';
+            ? formatDate(match.scheduledDate) 
+            : 'Instant match (no scheduled date)';
           
-          const confirmationStatus = match.player1Confirmed && match.player2Confirmed 
-            ? '✅ Both players confirmed' 
-            : match.player1Confirmed 
-              ? '⏳ Waiting for player 2 confirmation' 
-              : match.player2Confirmed 
-                ? '⏳ Waiting for player 1 confirmation'
-                : '⏳ Waiting for both players to confirm';
-          
-          // Get match status with confirmation details
-          let matchStatusDisplay = match.status;
-          if (match.status === MatchStatus.SCHEDULED) {
-            if (match.player1Confirmed && match.player2Confirmed) {
-              matchStatusDisplay = 'Ready to play';
-            } else {
-              matchStatusDisplay = 'Waiting for acceptance';
-            }
-          }
-          
-          const leagueInfo = `League: ${match.league.name}`;
-          const opponentId = interaction.user.id === match.player1Id ? match.player2Id : match.player1Id;
+          const confirmationStatus = `${match.player1Confirmed ? '✅' : '❌'} vs ${match.player2Confirmed ? '✅' : '❌'}`;
           
           embed.addFields({
             name: `Match #${index + 1}`,
-            value: `**Players**: <@${match.player1Id}> vs <@${match.player2Id}>\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+            value: `**Players**: ${player1Name} vs ${player2Name}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**ID**: \`${match.id.substring(0, 8)}...\``,
             inline: false
           });
         });
@@ -422,9 +437,9 @@ const viewMatchesCommand: Command = {
     } catch (error: any) {
       console.error('Error in view_matches command:', error);
       if (interaction.deferred) {
-        await interaction.editReply('An error occurred while retrieving matches.');
+        await interaction.editReply('An error occurred while viewing matches.');
       } else {
-        await interaction.reply({ content: 'An error occurred while retrieving matches.', ephemeral: true });
+        await interaction.reply({ content: 'An error occurred while viewing matches.', ephemeral: true });
       }
     }
   }
@@ -441,11 +456,14 @@ const myMatchesCommand: Command = {
         .setRequired(false)
         .setAutocomplete(true)
     ) as unknown as SlashCommandBuilder,
+  
   async execute(interaction: ChatInputCommandInteraction) {
     try {
       // Don't defer reply here since it's already deferred in index.ts
       
       const guildId = interaction.guildId || undefined;
+      
+      // Get all matches for this user
       const matches = await db.getPlayerMatches(interaction.user.id, undefined, guildId);
       
       if (matches.length === 0) {
@@ -488,7 +506,7 @@ const myMatchesCommand: Command = {
             const dateInfo = match.scheduledDate 
               ? formatDate(match.scheduledDate) 
               : 'Instant match (no scheduled date)';
-
+            
             // Confirmation status
             const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
             const player2Confirmed = match.player2Confirmed ? '✅' : '❌';

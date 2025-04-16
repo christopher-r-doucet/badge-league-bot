@@ -1,6 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder, AutocompleteInteraction, EmbedBuilder, CommandInteraction, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
 import type { Command } from '../types/commands.js';
-import { db } from '../database/index.js';
+import { db } from '../database/index-new-complete.js';
 
 // Helper function for league name autocomplete
 async function handleLeagueAutocomplete(interaction: AutocompleteInteraction) {
@@ -8,7 +8,7 @@ async function handleLeagueAutocomplete(interaction: AutocompleteInteraction) {
   const guildId = interaction.guildId || undefined;
   
   // Only show leagues for the current guild
-  const leagues = await db.getLeagues(guildId);
+  const leagues = await db.getGuildLeagues(guildId);
   
   const filtered = leagues
     .filter((league) => league.name.toLowerCase().includes(focusedValue))
@@ -112,20 +112,12 @@ const joinLeagueCommand = {
       // Create success embed
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle('✅ Welcome to the League!')
+        .setTitle('🎮 Joined League!')
         .setDescription(`Successfully joined **${leagueName}**`)
         .addFields(
           { name: 'Player', value: interaction.user.username, inline: true },
-          { name: 'Starting ELO', value: '1000', inline: true },
-          { name: 'Starting Rank', value: 'Bronze', inline: true },
-          { 
-            name: 'Next Steps',
-            value: [
-              '• Check your stats with `/status`',
-              '• View league standings with `/league_standings`',
-              '• Invite friends with `/invite_to_league`'
-            ].join('\n')
-          }
+          { name: 'Starting ELO', value: player.elo.toString(), inline: true },
+          { name: 'Rank', value: player.rank, inline: true }
         )
         .setTimestamp()
         .setFooter({ text: 'Badge League Bot' });
@@ -149,46 +141,55 @@ const listLeaguesCommand = {
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
 
+    const guildId = interaction.guildId;
+    
+    // Ensure the command is used in a guild
+    if (!guildId) {
+      return interaction.editReply({ content: '❌ This command can only be used in a server.' });
+    }
+
     try {
-      const guildId = interaction.guildId || undefined;
-      const leagues = await db.getLeagues(guildId);
-
+      const leagues = await db.getGuildLeagues(guildId);
+      
       if (leagues.length === 0) {
-        await interaction.editReply({ content: 'No leagues found. Create one with `/create_league`!' });
-        return;
+        return interaction.editReply({ content: 'No leagues found in this server. Create one with `/create_league`!' });
       }
-
-      // Create the leagues embed
+      
+      // Create embed
       const embed = new EmbedBuilder()
         .setColor(0x0099FF)
-        .setTitle('🏆 Available Leagues')
-        .setDescription('Here are all the leagues you can join:')
+        .setTitle('Available Leagues')
+        .setDescription(`Found ${leagues.length} leagues in this server`)
         .setTimestamp()
         .setFooter({ text: 'Badge League Bot' });
-
-      // Add leagues list
-      let leaguesText = '';
       
-      // Use Promise.all to handle async operations in forEach
-      await Promise.all(leagues.map(async (league, index) => {
-        leaguesText += `${index + 1}. **${league.name}**\n`;
-        
+      // Add leagues to embed
+      const leagueFields = await Promise.all(leagues.map(async (league, index) => {
         // Get player count for this league
-        const playerCount = await db.getPlayerCountByLeague(league.name);
-        leaguesText += `   • Players: ${playerCount}\n`;
+        const players = await db.getLeaguePlayers(league.name);
+        const playerCount = players.length;
+        
+        return {
+          name: `${index + 1}. ${league.name}`,
+          value: `**Players**: ${playerCount}\n**Created**: <t:${Math.floor(new Date(league.createdAt).getTime() / 1000)}:R>`,
+          inline: true
+        };
       }));
-
-      embed.addFields({ 
-        name: 'Leagues', 
-        value: leaguesText || 'No leagues available'
-      });
-
+      
+      embed.addFields(leagueFields);
+      
+      // Add a blank field if we have an odd number of leagues
+      if (leagueFields.length % 2 === 1) {
+        embed.addFields({ name: '\u200B', value: '\u200B', inline: true });
+      }
+      
       // Add instructions
       embed.addFields({
         name: 'How to Join',
-        value: 'Use `/join_league` to join a league\nOr create your own with `/create_league`!'
+        value: 'Use `/join_league` to join a league\nUse `/league_standings` to view rankings',
+        inline: false
       });
-
+      
       await interaction.editReply({ embeds: [embed] });
 
     } catch (error) {
@@ -220,35 +221,49 @@ const leagueStandingsCommand = {
     if (!interaction.isChatInputCommand()) return;
 
     const leagueName = interaction.options.getString('league', true);
+    const guildId = interaction.guildId;
+    
+    // Ensure the command is used in a guild
+    if (!guildId) {
+      return interaction.editReply({ content: '❌ This command can only be used in a server.' });
+    }
 
     try {
-      const players = await db.getLeagueStandings(leagueName);
-
-      if (!players) {
-        await interaction.editReply({ content: `❌ League "${leagueName}" not found` });
-        return;
+      // Get the league
+      const league = await db.getLeague(leagueName, guildId);
+      
+      if (!league) {
+        return interaction.editReply({ content: `❌ League "${leagueName}" not found` });
       }
-
+      
+      // Get players in the league sorted by ELO
+      const players = await db.getLeagueLeaderboard(leagueName);
+      
       if (players.length === 0) {
-        await interaction.editReply({ content: `No players found in league "${leagueName}"` });
-        return;
+        return interaction.editReply({ content: `No players found in league "${leagueName}"` });
       }
-
-      // Create the standings embed
+      
+      // Create embed
       const embed = new EmbedBuilder()
         .setColor(0x0099FF)
-        .setTitle(`📊 ${leagueName} - League Standings`)
-        .setDescription('Here are the current rankings:')
+        .setTitle(`${leagueName} - Standings`)
+        .setDescription(`Current rankings for **${leagueName}**`)
         .setTimestamp()
         .setFooter({ text: 'Badge League Bot' });
-
+      
       // Add player standings
       let standingsText = '';
+      
       players.forEach((player, index) => {
-        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '•';
-        const rankEmoji = player.rank === 'Diamond' ? '<:diamond:1361443608506532164>' : 
-                         player.rank === 'Grandmaster' ? '<:grandmaster:1361443558128881814>' :
-                         player.rank === 'Master' ? '<:master:1361443524226322474>' :
+        // Medal for top 3
+        const medal = index === 0 ? '🥇' : 
+                      index === 1 ? '🥈' : 
+                      index === 2 ? '🥉' : '';
+        
+        // Rank emoji
+        const rankEmoji = player.rank === 'Grandmaster' ? '<:grandmaster:1361443516487028777>' :
+                         player.rank === 'Master' ? '<:master:1361443494722637854>' :
+                         player.rank === 'Diamond' ? '<:diamond:1361443516487028777>' :
                          player.rank === 'Gold' ? '<:gold:1361443575543627822>' :
                          player.rank === 'Silver' ? '<:silver:1361443541070643443>' :
                          player.rank === 'Bronze' ? '<:bronze:1361443594963255346>' : '•';
@@ -260,9 +275,9 @@ const leagueStandingsCommand = {
       embed.addFields({ name: 'Rankings', value: standingsText });
 
       // Add some stats
-      const avgElo = Math.round(players.reduce((sum, p) => sum + p.elo, 0) / players.length);
-      const highestElo = Math.max(...players.map(p => p.elo));
-      const lowestElo = Math.min(...players.map(p => p.elo));
+      const avgElo = Math.round(players.reduce((sum: number, p) => sum + p.elo, 0) / players.length);
+      const highestElo = Math.max(...players.map((p) => p.elo));
+      const lowestElo = Math.min(...players.map((p) => p.elo));
 
       embed.addFields(
         { name: 'League Stats', value: '\u200B', inline: false },
@@ -308,9 +323,27 @@ const inviteToLeagueCommand = {
     const leagueName = interaction.options.getString('league', true);
     const invitee = interaction.options.getUser('player', true);
     const inviter = interaction.user;
+    const guildId = interaction.guildId;
+    
+    // Ensure the command is used in a guild
+    if (!guildId) {
+      return interaction.editReply({ content: '❌ This command can only be used in a server.' });
+    }
 
     try {
-      const { league, inviter: inviterStats } = await db.invitePlayerToLeague(leagueName, inviter.id, invitee.id);
+      // Get the league
+      const league = await db.getLeague(leagueName, guildId);
+      
+      if (!league) {
+        return interaction.editReply({ content: `❌ League "${leagueName}" not found` });
+      }
+      
+      // Check if inviter is in the league
+      const inviterIsInLeague = await db.isPlayerInLeague(inviter.id, leagueName, guildId);
+      
+      if (!inviterIsInLeague) {
+        return interaction.editReply({ content: `❌ You must be a member of the league to invite others` });
+      }
 
       // Create a button for joining the league
       const joinButton = new ButtonBuilder()
