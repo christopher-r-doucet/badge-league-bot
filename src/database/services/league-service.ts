@@ -149,41 +149,45 @@ export class LeagueService implements ILeagueService {
    */
   async deleteLeague(leagueId: string, discordId: string, guildId?: string): Promise<boolean> {
     try {
-      const league = await this.leagueRepository.findById(leagueId);
-      
-      if (!league) {
-        console.log(`League ${leagueId} not found`);
-        return false;
-      }
-      
       // Check if the user is the creator of the league
       const isCreator = await this.isLeagueCreator(leagueId, discordId);
       
-      if (!isCreator) {
-        console.log(`User ${discordId} is not the creator of league ${leagueId}`);
-        return false;
+      // Check if the user is an admin (currently only one admin user)
+      const isAdmin = discordId === '125313671906852864'; // Admin user ID
+      
+      if (!isCreator && !isAdmin) {
+        throw new Error('Only the league creator or an admin can delete a league');
       }
       
-      // Check if there are any active matches in the league
-      const activeMatches = await this.matchRepository.findByStatusAndLeague(MatchStatus.SCHEDULED, leagueId);
+      // Get the league
+      const league = await this.leagueRepository.findById(leagueId);
       
-      if (activeMatches && activeMatches.length > 0) {
-        console.log(`Cannot delete league ${leagueId} because it has ${activeMatches.length} active matches`);
-        return false;
+      if (!league) {
+        throw new Error('League not found');
       }
       
-      // Check if there are any players in the league
-      const players = await this.playerRepository.findByLeagueId(leagueId);
-      
-      if (players && players.length > 0) {
-        console.log(`Cannot delete league ${leagueId} because it has ${players.length} players`);
-        return false;
+      // If not admin, check for active matches and players
+      if (!isAdmin) {
+        // Check if there are any active matches in the league
+        const activeMatches = await this.matchRepository.findByStatusAndLeague(MatchStatus.SCHEDULED, leagueId);
+        
+        if (activeMatches.length > 0) {
+          throw new Error('Cannot delete league with active matches');
+        }
+        
+        // Check if there are any players in the league
+        const players = await this.playerRepository.findByLeagueId(leagueId);
+        
+        if (players.length > 0) {
+          throw new Error('Cannot delete league with players. All players must leave first.');
+        }
+      } else {
+        console.log(`Admin user ${discordId} is deleting league ${leagueId} with override privileges`);
       }
       
       // Delete the league
-      await this.leagueRepository.remove(league);
+      await this.leagueRepository.delete(leagueId);
       
-      console.log(`League ${leagueId} deleted by user ${discordId}`);
       return true;
     } catch (error) {
       console.error('Error deleting league:', error);

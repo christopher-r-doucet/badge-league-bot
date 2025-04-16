@@ -433,7 +433,7 @@ const leaveLeagueCommand = {
   
   async execute(interaction: ChatInputCommandInteraction) {
     try {
-      await interaction.deferReply();
+      // Don't defer reply here since it's already deferred in index.ts
       
       const leagueName = interaction.options.getString('league', true);
       const guildId = interaction.guildId;
@@ -465,7 +465,11 @@ const leaveLeagueCommand = {
       return interaction.editReply(`You have successfully left the "${leagueName}" league.`);
     } catch (error: any) {
       console.error('Error executing leave_league command:', error);
-      return interaction.editReply(`Error leaving league: ${error.message}`);
+      
+      // Check if we can still reply
+      if (!interaction.replied) {
+        return interaction.editReply(`Error leaving league: ${error.message}`);
+      }
     }
   }
 } as Command;
@@ -473,7 +477,7 @@ const leaveLeagueCommand = {
 const deleteLeagueCommand = {
   data: new SlashCommandBuilder()
     .setName('delete_league')
-    .setDescription('Delete a league (creator only, and only if empty)')
+    .setDescription('Delete a league (creator only, admin can override restrictions)')
     .addStringOption(option => 
       option.setName('league')
         .setDescription('The name of the league')
