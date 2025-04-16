@@ -121,8 +121,7 @@ export class MatchRepository extends BaseRepository<Match> implements IMatchRepo
     
     // Find all matches where the player is a participant
     const matches = await this.repository.find({
-      where: whereClause,
-      relations: ['league']
+      where: whereClause
     });
     
     // Enrich the matches with player and league details
