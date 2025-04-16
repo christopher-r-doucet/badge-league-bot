@@ -103,7 +103,27 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
 
   // Pagination for my_matches
   if (['next_page', 'prev_page'].includes(customId)) {
-    await myMatchesCommand.handleComponent(interaction);
+    if (myMatchesCommand && typeof myMatchesCommand.handleComponent === 'function') {
+      await myMatchesCommand.handleComponent(interaction);
+    }
+    return;
+  }
+
+  // Per-match cancel button for my_matches
+  if (customId.startsWith('cancel_match:')) {
+    const matchId = customId.split(':')[1];
+    // Call a cancel handler in myMatchesCommand if it exists, otherwise handle here
+    if (myMatchesCommand && typeof myMatchesCommand.cancelMatch === 'function') {
+      await myMatchesCommand.cancelMatch(interaction, matchId);
+    } else {
+      // Fallback: cancel match and update UI
+      try {
+        await db.cancelMatch(matchId, interaction.user.id);
+        await interaction.reply({ content: 'Match cancelled.', ephemeral: true });
+      } catch (error) {
+        await interaction.reply({ content: 'Failed to cancel match.', ephemeral: true });
+      }
+    }
     return;
   }
 
