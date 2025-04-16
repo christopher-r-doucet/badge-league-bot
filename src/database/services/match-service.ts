@@ -7,6 +7,16 @@ import { ILeagueRepository, LeagueRepository } from '../repositories/league-repo
 import { MoreThanOrEqual, In } from 'typeorm';
 
 /**
+ * Extended match interface with ELO change information
+ */
+interface MatchWithEloInfo extends Match {
+  player1EloChange?: number;
+  player2EloChange?: number;
+  player1EloBefore?: number;
+  player2EloBefore?: number;
+}
+
+/**
  * Match service interface
  */
 export interface IMatchService {
@@ -38,7 +48,7 @@ export interface IMatchService {
   /**
    * Report a match result
    */
-  reportMatchResult(matchId: string, reporterId: string, player1Score: number, player2Score: number): Promise<Match>;
+  reportMatchResult(matchId: string, reporterId: string, player1Score: number, player2Score: number): Promise<MatchWithEloInfo>;
   
   /**
    * Cancel a match
@@ -206,7 +216,7 @@ export class MatchService implements IMatchService {
   /**
    * Report a match result
    */
-  async reportMatchResult(matchId: string, reporterId: string, player1Score: number, player2Score: number): Promise<Match> {
+  async reportMatchResult(matchId: string, reporterId: string, player1Score: number, player2Score: number): Promise<MatchWithEloInfo> {
     try {
       // Find the match
       const match = await this.matchRepository.findById(matchId);
@@ -292,7 +302,7 @@ export class MatchService implements IMatchService {
         player2EloChange: player2.id === winner.id ? +eloChange : -eloChange,
         player1EloBefore,
         player2EloBefore
-      };
+      } as MatchWithEloInfo;
     } catch (error) {
       console.error('Error reporting match result:', error);
       throw error;
