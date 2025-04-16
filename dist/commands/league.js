@@ -9,19 +9,29 @@ async function handleLeagueAutocomplete(interaction, onlyPlayerLeagues = false) 
         if (onlyPlayerLeagues) {
             // Only get leagues the player is in
             leagues = await db.getPlayerLeagues(interaction.user.id, guildId);
+            console.log(`Retrieved ${leagues.length} player leagues for autocomplete`);
         }
         else {
             // Get all leagues in the guild
             leagues = await db.getGuildLeagues(guildId);
+            console.log(`Retrieved ${leagues.length} guild leagues for autocomplete`);
+        }
+        // Add additional logging to debug
+        if (leagues.length === 0) {
+            console.log(`No leagues found for user ${interaction.user.id} in guild ${guildId || 'DM'}`);
+            await interaction.respond([]);
+            return;
         }
         const filtered = leagues
             .filter((league) => league.name.toLowerCase().includes(focusedValue))
             .slice(0, 25)
             .map((league) => ({ name: league.name, value: league.name }));
+        console.log(`Responding with ${filtered.length} filtered leagues for autocomplete`);
         await interaction.respond(filtered);
     }
     catch (error) {
         console.error('Error in league autocomplete:', error);
+        // Respond with empty array to prevent Discord API timeout
         await interaction.respond([]);
     }
 }
@@ -39,6 +49,7 @@ const createLeagueCommand = {
         .setRequired(true)
         .setMinLength(1)
         .setMaxLength(50)),
+    deploymentType: 'global',
     async execute(interaction) {
         if (!interaction.isChatInputCommand())
             return;
@@ -90,6 +101,7 @@ const joinLeagueCommand = {
         .setDescription('The name of the league')
         .setRequired(true)
         .setAutocomplete(true)),
+    deploymentType: 'global',
     async autocomplete(interaction) {
         const focusedOption = interaction.options.getFocused(true);
         if (focusedOption.name === 'league') {
@@ -131,6 +143,7 @@ const listLeaguesCommand = {
     data: new SlashCommandBuilder()
         .setName('list_leagues')
         .setDescription('List All Available Leagues'),
+    deploymentType: 'global',
     async execute(interaction) {
         if (!interaction.isChatInputCommand())
             return;
@@ -193,6 +206,7 @@ const leagueStandingsCommand = {
         .setDescription('The name of the league')
         .setRequired(true)
         .setAutocomplete(true)),
+    deploymentType: 'global',
     async autocomplete(interaction) {
         const focusedOption = interaction.options.getFocused(true);
         if (focusedOption.name === 'league') {
@@ -272,6 +286,7 @@ const inviteToLeagueCommand = {
         .addUserOption(option => option.setName('player')
         .setDescription('The player to invite')
         .setRequired(true)),
+    deploymentType: 'global',
     async autocomplete(interaction) {
         const focusedOption = interaction.options.getFocused(true);
         if (focusedOption.name === 'league') {
@@ -341,6 +356,7 @@ const leaveLeagueCommand = {
         .setDescription('The league you want to leave')
         .setRequired(true)
         .setAutocomplete(true)),
+    deploymentType: 'global',
     async autocomplete(interaction) {
         const focusedOption = interaction.options.getFocused(true);
         if (focusedOption.name === 'league') {
@@ -349,7 +365,7 @@ const leaveLeagueCommand = {
     },
     async execute(interaction) {
         try {
-            await interaction.deferReply();
+            // Don't defer reply here since it's already deferred in index.ts
             const leagueName = interaction.options.getString('league', true);
             const guildId = interaction.guildId;
             // Check if the player is in the league
@@ -373,30 +389,55 @@ const leaveLeagueCommand = {
         }
         catch (error) {
             console.error('Error executing leave_league command:', error);
-            return interaction.editReply(`Error leaving league: ${error.message}`);
+            // Check if we can still reply
+            if (!interaction.replied) {
+                return interaction.editReply(`Error leaving league: ${error.message}`);
+            }
         }
     }
 };
 const deleteLeagueCommand = {
     data: new SlashCommandBuilder()
         .setName('delete_league')
-        .setDescription('Delete a league (creator only, and only if empty)')
+        .setDescription('Delete a league (creator only, admin can override restrictions)')
         .addStringOption(option => option.setName('league')
-        .setDescription('The league you want to delete')
+        .setDescription('The name of the league')
         .setRequired(true)
         .setAutocomplete(true))
         .addBooleanOption(option => option.setName('confirm')
         .setDescription('Confirm that you want to delete this league')
         .setRequired(true)),
+    deploymentType: 'global',
     async autocomplete(interaction) {
         const focusedOption = interaction.options.getFocused(true);
         if (focusedOption.name === 'league') {
-            await handleLeagueAutocomplete(interaction, true); // true = only show leagues the player is in
+            try {
+                const focusedValue = focusedOption.value.toLowerCase();
+                const guildId = interaction.guildId || undefined;
+                // Get leagues created by this user
+                const leagues = await db.getCreatedLeagues(interaction.user.id, guildId);
+                console.log(`Retrieved ${leagues.length} created leagues for delete_league autocomplete`);
+                if (leagues.length === 0) {
+                    console.log(`No created leagues found for user ${interaction.user.id} in guild ${guildId || 'DM'}`);
+                    await interaction.respond([]);
+                    return;
+                }
+                const filtered = leagues
+                    .filter((league) => league.name.toLowerCase().includes(focusedValue))
+                    .slice(0, 25)
+                    .map((league) => ({ name: league.name, value: league.name }));
+                console.log(`Responding with ${filtered.length} filtered leagues for delete_league autocomplete`);
+                await interaction.respond(filtered);
+            }
+            catch (error) {
+                console.error('Error in delete_league autocomplete:', error);
+                await interaction.respond([]);
+            }
         }
     },
     async execute(interaction) {
         try {
-            await interaction.deferReply();
+            // Don't defer reply here since it's already deferred in index.ts
             const leagueName = interaction.options.getString('league', true);
             const confirm = interaction.options.getBoolean('confirm', true);
             const guildId = interaction.guildId;
@@ -422,7 +463,10 @@ const deleteLeagueCommand = {
         }
         catch (error) {
             console.error('Error executing delete_league command:', error);
-            return interaction.editReply(`Error deleting league: ${error.message}`);
+            // Check if we can still reply
+            if (!interaction.replied) {
+                return interaction.editReply(`Error deleting league: ${error.message}`);
+            }
         }
     }
 };

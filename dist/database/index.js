@@ -299,6 +299,14 @@ export class Database {
         const leagueService = await this.getLeagueService();
         return leagueService.isLeagueCreator(leagueId, discordId);
     }
+    /**
+     * Get leagues created by a user
+     */
+    static async getCreatedLeagues(discordId, guildId) {
+        await this.ensureInitialized();
+        const leagueService = await this.getLeagueService();
+        return leagueService.getCreatedLeagues(discordId, guildId);
+    }
     // USER PREFERENCE METHODS
     /**
      * Get user preference

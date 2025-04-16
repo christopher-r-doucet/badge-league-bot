@@ -106,23 +106,76 @@ export class MatchRepository extends BaseRepository<Match> implements IMatchRepo
     
     const playerIds = players.map((player: Player) => player.id);
     
-    // If status is provided, filter by status
+    // Build the query based on whether status is provided
+    let whereClause: any[] = [
+      { player1Id: In(playerIds) },
+      { player2Id: In(playerIds) }
+    ];
+    
     if (status) {
-      return this.repository.find({
-        where: [
-          { player1Id: In(playerIds), status },
-          { player2Id: In(playerIds), status }
-        ]
-      });
+      whereClause = [
+        { player1Id: In(playerIds), status },
+        { player2Id: In(playerIds), status }
+      ];
     }
     
-    // Otherwise, return all matches
-    return this.repository.find({
-      where: [
-        { player1Id: In(playerIds) },
-        { player2Id: In(playerIds) }
-      ]
+    // Find all matches where the player is a participant
+    const matches = await this.repository.find({
+      where: whereClause,
+      relations: ['league']
     });
+    
+    // Enrich the matches with player and league details
+    const enrichedMatches = await Promise.all(matches.map(async (match) => {
+      // Get player details
+      const player1 = await this.playerRepository.findOne({ where: { id: match.player1Id } });
+      const player2 = await this.playerRepository.findOne({ where: { id: match.player2Id } });
+      
+      // Create enriched player objects with fallbacks for missing data
+      const enrichedPlayer1 = player1 ? {
+        ...player1,
+        discordId: player1.discordId || 'unknown',
+        username: player1.username || 'Unknown Player'
+      } : { 
+        id: match.player1Id,
+        discordId: 'unknown',
+        username: 'Unknown Player',
+        elo: 0
+      };
+      
+      const enrichedPlayer2 = player2 ? {
+        ...player2,
+        discordId: player2.discordId || 'unknown',
+        username: player2.username || 'Unknown Player'
+      } : {
+        id: match.player2Id,
+        discordId: 'unknown',
+        username: 'Unknown Player',
+        elo: 0
+      };
+      
+      // Get league details if not already loaded
+      let league = null;
+      if (match.leagueId) {
+        league = await this.leagueRepository.findOne({ where: { id: match.leagueId } });
+      }
+      
+      // Return the enriched match
+      return {
+        ...match,
+        league,
+        player1: enrichedPlayer1,
+        player2: enrichedPlayer2,
+        // For convenience, determine who the opponent is
+        opponent: match.player1Id === enrichedPlayer1.id ? enrichedPlayer2 : enrichedPlayer1,
+        opponentUsername: match.player1Id === enrichedPlayer1.id ? enrichedPlayer2.username : enrichedPlayer1.username,
+        // Keep the IDs directly accessible for backward compatibility
+        player1Id: match.player1Id,
+        player2Id: match.player2Id
+      };
+    }));
+    
+    return enrichedMatches;
   }
   
   /**
