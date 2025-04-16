@@ -92,7 +92,7 @@ async function paginateMatches(interaction: ButtonInteraction | ChatInputCommand
   await interaction.editReply({ embeds: [embed], components: row.components.length ? [row] : [] });
 }
 
-const myMatchesCommand: Command = {
+const myMatchesCommand = {
   data: new SlashCommandBuilder()
     .setName('my_matches')
     .setDescription('View My Matches (upcoming and completed) [Guild]')
@@ -101,7 +101,7 @@ const myMatchesCommand: Command = {
         .setDescription('The league to view matches for')
         .setRequired(false)
         .setAutocomplete(true)
-    ) as unknown as SlashCommandBuilder,
+    ),
   deploymentType: 'global',
   async execute(interaction: ChatInputCommandInteraction) {
     try {
@@ -156,6 +156,6 @@ const myMatchesCommand: Command = {
       await interaction.reply({ content: 'Failed to cancel match.', ephemeral: true });
     }
   },
-};
+} as Command;
 
 export default myMatchesCommand;
