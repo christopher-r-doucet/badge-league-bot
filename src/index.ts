@@ -283,7 +283,33 @@ async function handleSelectMenuInteraction(interaction: Interaction) {
 
 // Handle autocomplete interactions
 async function handleAutocomplete(interaction: Interaction) {
-  // Not implemented
+  if (!interaction.isAutocomplete()) return;
+  
+  try {
+    // Find the command that matches the autocomplete request
+    const command = commands.get(interaction.commandName);
+    
+    if (!command) {
+      console.error(`No command matching ${interaction.commandName} was found for autocomplete.`);
+      return;
+    }
+    
+    if (!command.autocomplete) {
+      console.error(`Command ${interaction.commandName} does not have an autocomplete handler.`);
+      return;
+    }
+    
+    // Log autocomplete request
+    console.log(`Processing autocomplete for command: ${interaction.commandName}, option: ${interaction.options.getFocused(true).name}`);
+    
+    // Execute the command's autocomplete handler
+    await command.autocomplete(interaction);
+  } catch (error) {
+    console.error(`Error handling autocomplete for ${interaction.commandName}:`, error);
+    // We can't reply to autocomplete interactions with an error message,
+    // so we'll just log it and return an empty array
+    await interaction.respond([]);
+  }
 }
 
 // Match button handlers
