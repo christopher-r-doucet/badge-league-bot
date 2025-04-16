@@ -11,6 +11,14 @@ A Discord bot for organizing and managing competitive leagues with a visual rank
 - **Interactive UI**: Rich embeds and interactive buttons for better user experience
 - **Autocomplete**: Smart suggestions when typing league names
 
+## Recent Updates
+
+- **Database Layer Refactoring**: Implemented repository pattern for improved maintainability and separation of concerns
+- **Player Identification Fix**: Fixed the `/my_matches` command to display opponent usernames instead of Discord IDs
+- **Match Reporting Improvements**: Updated the `/report_result` command to correctly identify participants across multiple leagues
+- **Match Cancellation Enhancement**: Improved validation for player participation in match cancellation
+- **Error Handling**: Added robust error handling and fallbacks for missing player data
+
 ## Setup Instructions
 
 1. **Create a Discord Bot Application**
@@ -67,6 +75,11 @@ A Discord bot for organizing and managing competitive leagues with a visual rank
 - `/invite_to_league` - Invite a player to join your league with a clickable button
 - `/status` - Check your current rank, ELO, wins, losses, and badge
 - `/help` - Display help information about the bot and available commands
+- `/schedule_match` - Schedule a match with another player
+- `/my_matches` - View your upcoming and completed matches
+- `/report_result` - Report the result of a completed match
+- `/view_matches` - View all matches in a league
+- `/cancel_match` - Cancel a match you scheduled
 
 ## Development
 
@@ -74,6 +87,57 @@ This bot is built with:
 - TypeScript
 - discord.js v14
 - TypeORM with SQLite
+
+### Architecture
+
+The bot follows a clean architecture pattern with the following components:
+
+#### Database Layer
+- **Repository Pattern**: Each entity (League, Player, Match, UserPreference) has its own repository
+- **Base Repository**: Common CRUD operations are standardized in a base repository
+- **Service Layer**: Business logic is encapsulated in service classes
+- **Facade Pattern**: A database facade provides a unified interface and backward compatibility
+
+```
+src/
+├── database/
+│   ├── connection.ts           # Database connection management
+│   ├── index-new-complete.ts   # Database facade
+│   ├── repositories/           # Data access layer
+│   │   ├── base-repository.ts  # Base repository interface and implementation
+│   │   ├── league-repository.ts
+│   │   ├── match-repository.ts
+│   │   ├── player-repository.ts
+│   │   └── user-preference-repository.ts
+│   └── services/               # Business logic layer
+│       ├── league-service.ts
+│       ├── match-service.ts
+│       ├── player-service.ts
+│       └── user-preference-service.ts
+├── entities/                   # TypeORM entities
+│   ├── League.ts
+│   ├── Match.ts
+│   ├── Player.ts
+│   └── UserPreference.ts
+└── commands/                   # Discord slash commands
+    ├── index.ts
+    ├── league.ts
+    ├── match.ts
+    └── player.ts
+```
+
+### Ranking System
+
+The bot uses a competitive ranking system with the following tiers:
+
+1. **Bronze**: Default starting rank, below 1400 ELO
+2. **Silver**: 1400-1599 ELO
+3. **Gold**: 1600-1799 ELO
+4. **Diamond**: 1800-1999 ELO
+5. **Master**: 2000-2199 ELO
+6. **Grandmaster**: Exclusive rank for players with 2200+ ELO
+
+The Grandmaster rank is special - only one player per league can hold it at a time. The player with the highest ELO (minimum 2200) in each league gets the Grandmaster title. If someone surpasses the current Grandmaster, they claim the title and the former Grandmaster is demoted to Master.
 
 ### Local Development
 

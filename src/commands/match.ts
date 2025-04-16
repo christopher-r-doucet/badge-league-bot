@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, CommandInteraction, ChatInputCommandInteraction, AutocompleteInteraction } from 'discord.js';
-import { db } from '../database/index.js';
+import { db } from '../database/index-new-complete.js';
 import { MatchStatus } from '../entities/Match.js';
 import { formatDate } from '../utils/formatters.js';
 import type { Command } from '../types/commands.js';
@@ -11,7 +11,7 @@ async function handleLeagueAutocomplete(interaction: AutocompleteInteraction) {
   const guildId = interaction.guildId || undefined;
   
   // Only show leagues for the current guild
-  const leagues = await db.getLeagues(guildId);
+  const leagues = await db.getGuildLeagues(guildId);
   
   const filtered = leagues
     .filter((league) => league.name.toLowerCase().includes(focusedValue))

@@ -1,7 +1,7 @@
 import { Client, Events, GatewayIntentBits, Interaction, ButtonInteraction, ButtonStyle, ButtonBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
 import { config } from 'dotenv';
 import { commands } from './commands/index.js';
-import { db } from './database/index.js';
+import { db } from './database/index-new-complete.js';
 import { formatDate } from './utils/formatters.js';
 
 // Load environment variables only in non-production environments
