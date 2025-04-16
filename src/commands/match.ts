@@ -52,9 +52,9 @@ async function handleMatchIdAutocomplete(interaction: AutocompleteInteraction) {
       .slice(0, 25)
       .map((match) => {
         // Create a descriptive label
-        const isPlayer1 = match.player1.discordId === userId;
+        const isPlayer1 = match.player1 && match.player1.discordId === userId;
         const opponent = isPlayer1 ? match.player2 : match.player1;
-        const opponentName = opponent ? opponent.username : 'Unknown player';
+        const opponentName = opponent && opponent.username ? opponent.username : 'Unknown player';
         
         const matchDate = match.scheduledDate ? 
           new Date(match.scheduledDate).toLocaleDateString() : 
@@ -272,8 +272,8 @@ const reportResultCommand: Command = {
         }
         
         // Check if user is a participant
-        const isPlayer1 = matchBefore.player1.discordId === interaction.user.id;
-        const isPlayer2 = matchBefore.player2.discordId === interaction.user.id;
+        const isPlayer1 = matchBefore.player1 && matchBefore.player1.discordId === interaction.user.id;
+        const isPlayer2 = matchBefore.player2 && matchBefore.player2.discordId === interaction.user.id;
         
         if (!isPlayer1 && !isPlayer2) {
           return interaction.editReply('You are not a participant in this match.');
@@ -301,18 +301,31 @@ const reportResultCommand: Command = {
         
         // Get enriched match with player details
         const enrichedMatch = await db.getMatch(matchId);
-        const winner = didWin ? interaction.user : (isPlayer1 ? enrichedMatch.player2 : enrichedMatch.player1);
-        const loser = didWin ? (isPlayer1 ? enrichedMatch.player2 : enrichedMatch.player1) : interaction.user;
+        
+        // Safely determine winner and loser player objects
+        const winnerPlayer = didWin ? 
+          (isPlayer1 ? enrichedMatch.player1 : enrichedMatch.player2) : 
+          (isPlayer1 ? enrichedMatch.player2 : enrichedMatch.player1);
+        
+        const loserPlayer = didWin ? 
+          (isPlayer1 ? enrichedMatch.player2 : enrichedMatch.player1) : 
+          (isPlayer1 ? enrichedMatch.player1 : enrichedMatch.player2);
+        
+        // Ensure we have valid player data
+        const winnerName = winnerPlayer && winnerPlayer.username ? winnerPlayer.username : 'Unknown player';
+        const loserName = loserPlayer && loserPlayer.username ? loserPlayer.username : 'Unknown player';
+        const winnerElo = winnerPlayer && typeof winnerPlayer.elo === 'number' ? winnerPlayer.elo : 'N/A';
+        const loserElo = loserPlayer && typeof loserPlayer.elo === 'number' ? loserPlayer.elo : 'N/A';
         
         // Create embed
         const embed = new EmbedBuilder()
           .setColor('#00ff00')
           .setTitle('Match Result Reported')
-          .setDescription(`Match in ${enrichedMatch.league.name} has been completed!`)
+          .setDescription(`Match in ${enrichedMatch.league ? enrichedMatch.league.name : 'Unknown league'} has been completed!`)
           .addFields(
-            { name: 'Winner', value: `<@${winner.discordId}>`, inline: true },
-            { name: 'Loser', value: `<@${loser.discordId}>`, inline: true },
-            { name: 'New ELO', value: `${winner.username}: ${winner.elo}\n${loser.username}: ${loser.elo}`, inline: false }
+            { name: 'Winner', value: `${winnerName}`, inline: true },
+            { name: 'Loser', value: `${loserName}`, inline: true },
+            { name: 'New ELO', value: `${winnerName}: ${winnerElo}\n${loserName}: ${loserElo}`, inline: false }
           );
         
         await interaction.editReply({ embeds: [embed] });
@@ -397,7 +410,7 @@ const viewMatchesCommand: Command = {
           
           embed.addFields({
             name: `Match #${index + 1}`,
-            value: `**Players**: <@${match.player1.discordId}> vs <@${match.player2.discordId}>\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+            value: `**Players**: <@${match.player1Id}> vs <@${match.player2Id}>\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
             inline: false
           });
         });
@@ -465,39 +478,44 @@ const myMatchesCommand: Command = {
         
         // Add each scheduled match
         scheduledMatches.forEach((match, index) => {
-          // Determine opponent
-          const isPlayer1 = match.player1.discordId === interaction.user.id;
-          const opponent = isPlayer1 ? match.player2 : match.player1;
-          const opponentName = opponent ? opponent.username : 'Unknown player';
+          try {
+            // Safely determine opponent
+            const isPlayer1 = match.player1 && match.player1.discordId === interaction.user.id;
+            const opponent = isPlayer1 ? match.player2 : match.player1;
+            const opponentName = opponent && opponent.username ? opponent.username : 'Unknown player';
 
-          // Format date
-          const dateInfo = match.scheduledDate 
-            ? formatDate(match.scheduledDate) 
-            : 'Instant match (no scheduled date)';
+            // Format date
+            const dateInfo = match.scheduledDate 
+              ? formatDate(match.scheduledDate) 
+              : 'Instant match (no scheduled date)';
 
-          // Confirmation status
-          const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
-          const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
-          const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
+            // Confirmation status
+            const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
+            const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
+            const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
 
-          // Get match status with confirmation details
-          let matchStatusDisplay = match.status;
-          if (match.status === MatchStatus.SCHEDULED) {
-            if (match.player1Confirmed && match.player2Confirmed) {
-              matchStatusDisplay = 'Ready to play';
-            } else {
-              matchStatusDisplay = 'Waiting for acceptance';
+            // Get match status with confirmation details
+            let matchStatusDisplay = match.status;
+            if (match.status === MatchStatus.SCHEDULED) {
+              if (match.player1Confirmed && match.player2Confirmed) {
+                matchStatusDisplay = 'Ready to play';
+              } else {
+                matchStatusDisplay = 'Waiting for acceptance';
+              }
             }
+
+            // Get league name
+            const leagueInfo = `League ID: ${match.leagueId}`;
+
+            embed.addFields({
+              name: `Match #${index + 1}`,
+              value: `**Opponent**: ${opponentName}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+              inline: false
+            });
+          } catch (error) {
+            console.error(`Error processing match ${match.id}:`, error);
+            // Skip this match if there's an error
           }
-
-          // Get league name
-          const leagueInfo = `League ID: ${match.leagueId}`;
-
-          embed.addFields({
-            name: `Match #${index + 1}`,
-            value: `**Opponent**: ${opponentName}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
-            inline: false
-          });
         });
       }
       
@@ -514,25 +532,30 @@ const myMatchesCommand: Command = {
           .sort((a, b) => new Date(b.completedDate || 0).getTime() - new Date(a.completedDate || 0).getTime())
           .slice(0, 5)
           .forEach((match, index) => {
-            // Determine opponent and result
-            const isPlayer1 = match.player1.discordId === interaction.user.id;
-            const opponent = isPlayer1 ? match.player2 : match.player1;
-            const opponentName = opponent ? opponent.username : 'Unknown player';
-            const didWin = (isPlayer1 && match.winnerId === match.player1Id) || (!isPlayer1 && match.winnerId === match.player2Id);
+            try {
+              // Safely determine opponent and result
+              const isPlayer1 = match.player1 && match.player1.discordId === interaction.user.id;
+              const opponent = isPlayer1 ? match.player2 : match.player1;
+              const opponentName = opponent && opponent.username ? opponent.username : 'Unknown player';
+              const didWin = (isPlayer1 && match.winnerId === match.player1Id) || (!isPlayer1 && match.winnerId === match.player2Id);
 
-            // Format completion date
-            const dateInfo = match.completedDate 
-              ? formatDate(match.completedDate) 
-              : 'Unknown date';
+              // Format completion date
+              const dateInfo = match.completedDate 
+                ? formatDate(match.completedDate) 
+                : 'Unknown date';
 
-            // Get league name
-            const leagueInfo = `League ID: ${match.leagueId}`;
+              // Get league name
+              const leagueInfo = `League ID: ${match.leagueId}`;
 
-            embed.addFields({
-              name: `Match #${index + 1}`,
-              value: `**Opponent**: ${opponentName}\n**Result**: ${didWin ? '🏆 Win' : '❌ Loss'}\n**Date**: ${dateInfo}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
-              inline: false
-            });
+              embed.addFields({
+                name: `Match #${index + 1}`,
+                value: `**Opponent**: ${opponentName}\n**Result**: ${didWin ? '🏆 Win' : '❌ Loss'}\n**Date**: ${dateInfo}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+                inline: false
+              });
+            } catch (error) {
+              console.error(`Error processing completed match ${match.id}:`, error);
+              // Skip this match if there's an error
+            }
           });
       }
       
@@ -541,7 +564,7 @@ const myMatchesCommand: Command = {
       const actionRow = new ActionRowBuilder<ButtonBuilder>();
       
       // Only add confirm button if the player hasn't confirmed yet
-      const isPlayer1 = firstMatch.player1Id === interaction.user.id;
+      const isPlayer1 = firstMatch.player1 && firstMatch.player1.discordId === interaction.user.id;
       const hasConfirmed = isPlayer1 ? firstMatch.player1Confirmed : firstMatch.player2Confirmed;
       
       if (!hasConfirmed) {

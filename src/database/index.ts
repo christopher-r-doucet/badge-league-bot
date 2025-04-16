@@ -629,14 +629,14 @@ class Database {
       const playerRepository = this.dataSource.getRepository(Player);
       const matchRepository = this.dataSource.getRepository(Match);
       const leagueRepository = this.dataSource.getRepository(League);
-
+      
       console.log(`Getting matches for player with Discord ID: ${discordId}, status filter: ${status || 'none'}, guild filter: ${guildId || 'none'}`);
 
       // Find all player records for this Discord ID
       const players = await playerRepository.find({
         where: { discordId }
       });
-
+      
       console.log(`Found ${players.length} player records for Discord ID: ${discordId}`);
       
       if (players.length === 0) {
@@ -675,11 +675,25 @@ class Database {
           return null;
         }
         
+        // Ensure we have valid player objects with discordId
+        const enrichedPlayer1 = player1 ? {
+          ...player1,
+          discordId: player1.discordId || 'unknown'
+        } : null;
+        
+        const enrichedPlayer2 = player2 ? {
+          ...player2,
+          discordId: player2.discordId || 'unknown'
+        } : null;
+        
         return {
           ...match,
           league,
-          player1,
-          player2
+          player1: enrichedPlayer1,
+          player2: enrichedPlayer2,
+          // Keep the IDs directly accessible for backward compatibility
+          player1Id: match.player1Id,
+          player2Id: match.player2Id
         };
       }));
 
@@ -711,11 +725,37 @@ class Database {
       const player2 = await playerRepository.findOne({ where: { id: match.player2Id } });
       const league = await leagueRepository.findOne({ where: { id: match.leagueId } });
       
+      // Ensure we have valid player objects with discordId and username
+      const enrichedPlayer1 = player1 ? {
+        ...player1,
+        discordId: player1.discordId || 'unknown',
+        username: player1.username || 'Unknown Player'
+      } : { 
+        id: match.player1Id,
+        discordId: 'unknown',
+        username: 'Unknown Player',
+        elo: 0
+      };
+      
+      const enrichedPlayer2 = player2 ? {
+        ...player2,
+        discordId: player2.discordId || 'unknown',
+        username: player2.username || 'Unknown Player'
+      } : {
+        id: match.player2Id,
+        discordId: 'unknown',
+        username: 'Unknown Player',
+        elo: 0
+      };
+      
       return {
         ...match,
-        player1,
-        player2,
-        league
+        league,
+        player1: enrichedPlayer1,
+        player2: enrichedPlayer2,
+        // Keep the IDs directly accessible for backward compatibility
+        player1Id: match.player1Id,
+        player2Id: match.player2Id
       };
     } catch (error) {
       console.error('Error getting match:', error);
