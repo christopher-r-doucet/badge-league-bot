@@ -223,7 +223,8 @@ async function showPlayerStats(interaction: ChatInputCommandInteraction | String
             league = await db.getLeague(stats.leagueName || '', interaction.guildId || '');
         }
         
-        const leagueDisplay = league ? league.name : 'No League';
+        // Fix: Use stats.leagueName if available, even if league object couldn't be fetched
+        const leagueDisplay = stats.leagueName || (league ? league.name : 'No League');
         
         // Calculate win rate
         let winRate = '0%';
