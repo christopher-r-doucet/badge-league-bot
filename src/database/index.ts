@@ -728,21 +728,32 @@ class Database {
         throw new Error('This match is not in scheduled status');
       }
 
-      // Find the player
-      const player = await playerRepository.findOne({
-        where: { discordId }
+      // Find the player in the specific league for this match
+      const players = await playerRepository.find({
+        where: { 
+          discordId,
+          leagueId: match.leagueId
+        }
       });
 
-      if (!player) {
-        throw new Error('Player not found');
+      if (players.length === 0) {
+        throw new Error('Player not found in this league');
       }
+
+      const player = players[0]; // Take the first player found in this league
+
+      console.log(`Confirming match ${matchId} for player ${player.id} (Discord ID: ${discordId}) in league ${match.leagueId}`);
+      console.log(`Match player1Id: ${match.player1Id}, player2Id: ${match.player2Id}`);
 
       // Confirm based on player
       if (match.player1Id === player.id) {
+        console.log(`Player ${player.id} is player1 in this match`);
         match.player1Confirmed = true;
       } else if (match.player2Id === player.id) {
+        console.log(`Player ${player.id} is player2 in this match`);
         match.player2Confirmed = true;
       } else {
+        console.log(`Player ${player.id} is not a participant in this match`);
         throw new Error('You are not a participant in this match');
       }
 
