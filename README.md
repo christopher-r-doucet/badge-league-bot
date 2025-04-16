@@ -13,9 +13,11 @@ A Discord bot for organizing and managing competitive leagues with a visual rank
 
 ## Recent Updates
 
+- **Autocomplete Fix**: Fixed autocomplete functionality for league selection and match ID
+- **Simplified Match Reporting**: Changed match reporting to use a simple win/loss system instead of numerical scores
 - **Database Layer Refactoring**: Implemented repository pattern for improved maintainability and separation of concerns
 - **Player Identification Fix**: Fixed the `/my_matches` command to display opponent usernames instead of Discord IDs
-- **Match Reporting Improvements**: Updated the `/report_result` command to correctly identify participants across multiple leagues
+- **Match Reporting Improvements**: Updated match reporting to correctly identify participants across multiple leagues
 - **Match Cancellation Enhancement**: Improved validation for player participation in match cancellation
 - **Error Handling**: Added robust error handling and fallbacks for missing player data
 
@@ -77,9 +79,17 @@ A Discord bot for organizing and managing competitive leagues with a visual rank
 - `/help` - Display help information about the bot and available commands
 - `/schedule_match` - Schedule a match with another player
 - `/my_matches` - View your upcoming and completed matches
-- `/report_result` - Report the result of a completed match
 - `/view_matches` - View all matches in a league
 - `/cancel_match` - Cancel a match you scheduled
+
+## Match Reporting
+
+Match results are reported using interactive buttons:
+1. Find your match in `/my_matches`
+2. Click the "Report Result" button
+3. A dialog will appear asking if you won or lost
+4. Simply type "win" or "loss" to report your result
+5. The system will automatically update rankings and ELO ratings
 
 ## Development
 

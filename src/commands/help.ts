@@ -66,16 +66,20 @@ const helpCommand = {
       .setDescription('Commands for scheduling and reporting matches:')
       .addFields(
         { name: '/schedule_match', value: 'Schedule a match with another player', inline: true },
-        { name: '/report_result', value: 'Report the result of a completed match', inline: true },
+        { name: '/my_matches', value: 'View your upcoming and completed matches', inline: true },
         { name: '/view_matches', value: 'View all scheduled matches in a league', inline: true },
-        { name: '/my_matches', value: 'View your upcoming matches', inline: true }
+        { name: '/cancel_match', value: 'Cancel a scheduled match', inline: true }
       )
+      .addFields({
+        name: '📝 Reporting Match Results',
+        value: 'After completing a match, use the "Report Result" button on your match message. You\'ll be asked if you won or lost - simply type "win" or "loss" to report your result. The system will automatically update rankings and ELO ratings.'
+      })
       .addFields({
         name: '🚀 Getting Started',
         value: '1. Create a league with `/create_league`\n' +
                '2. Invite friends with `/invite_to_league`\n' +
                '3. Schedule matches with `/schedule_match`\n' +
-               '4. Report results with `/report_result`\n' +
+               '4. Report results using the "Report Result" button\n' +
                '5. Check standings with `/league_standings`'
       })
       .setTimestamp()
