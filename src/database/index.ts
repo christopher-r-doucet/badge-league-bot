@@ -7,6 +7,11 @@ import { UserPreference } from '../entities/UserPreference.js';
 import type { Rank } from '../entities/Player.js';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// ES Module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class Database {
   private dataSource: DataSource;
@@ -32,7 +37,7 @@ class Database {
           },
           synchronize: true,
           entities: [League, Player, Match, UserPreference],
-          migrations: [path.join(__dirname, '../migrations/*.js')],
+          migrations: [`${__dirname}/../migrations/*.js`],
           migrationsRun: true,
           logging: ['error', 'warn', 'migration']
         });
@@ -62,7 +67,7 @@ class Database {
       database: dbPath,
       synchronize: true,
       entities: [League, Player, Match, UserPreference],
-      migrations: [path.join(__dirname, '../migrations/*.js')],
+      migrations: [`${__dirname}/../migrations/*.js`],
       migrationsRun: true,
       logging: ['error', 'warn', 'migration']
     });
