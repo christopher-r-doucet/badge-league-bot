@@ -5,4 +5,5 @@ export interface Command {
   data: SlashCommandBuilder | Omit<SlashCommandBuilder, 'addSubcommandGroup' | 'addSubcommand'>;
   execute: (interaction: ChatInputCommandInteraction) => Promise<any>;
   autocomplete?: (interaction: AutocompleteInteraction) => Promise<void>;
+  deploymentType?: 'global' | 'guild'; // Track whether command is deployed globally or to a guild
 }

@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, Interaction, ButtonInteraction, ButtonStyle, ButtonBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
+import { Client, Events, GatewayIntentBits, Interaction, ButtonInteraction, ButtonStyle, ButtonBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { config } from 'dotenv';
 import { commands } from './commands/index.js';
 import { db } from './database/index-new-complete.js';
@@ -22,166 +22,269 @@ client.once(Events.ClientReady, c => {
 });
 
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {
-  // Handle button interactions
-  if (interaction.isButton()) {
-    console.log(`Processing button interaction: ${interaction.customId}`);
-    const customId = interaction.customId;
-    
-    try {
-      // Handle match-related buttons
-      if (customId.startsWith('match_accept:')) {
-        const [_, matchId] = customId.split(':');
-        await handleMatchAccept(interaction, matchId);
-        return;
-      }
-      
-      if (customId.startsWith('match_decline:')) {
-        const [_, matchId] = customId.split(':');
-        await handleMatchDecline(interaction, matchId);
-        return;
-      }
-      
-      if (customId.startsWith('match_confirm:')) {
-        const [_, matchId] = customId.split(':');
-        await handleMatchConfirm(interaction, matchId);
-        return;
-      }
-      
-      if (customId.startsWith('match_report:')) {
-        const [_, matchId] = customId.split(':');
-        await handleMatchReport(interaction, matchId);
-        return;
-      }
-      
-      if (customId.startsWith('match_cancel:')) {
-        const [_, matchId] = customId.split(':');
-        await handleMatchCancel(interaction, matchId);
-        return;
-      }
-      
-      // Handle league join buttons
-      if (customId.startsWith('join_league:')) {
-        await interaction.deferReply({ ephemeral: true });
-        
-        try {
-          const [_, leagueName, targetUserId] = customId.split(':');
-          
-          // Verify the user clicking is the invited user
-          if (interaction.user.id !== targetUserId) {
-            await interaction.editReply({ content: 'This invitation is for someone else.' });
-            return;
-          }
-          
-          // Get the guild ID from the interaction
-          const guildId = interaction.guildId;
-          if (!guildId) {
-            await interaction.editReply({ content: 'This command can only be used in a server.' });
-            return;
-          }
-          
-          // Add the player to the league
-          await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName, guildId);
-          
-          // Create success message
-          await interaction.editReply({ 
-            content: `✅ You've successfully joined **${leagueName}**! Check your status with \`/status\`.`
-          });
-          
-          // Update the original message to show the invitation was accepted
-          const originalEmbed = interaction.message.embeds[0];
-          const updatedEmbed = {
-            ...originalEmbed.data,
-            color: 0x00FF00, // Green color
-            title: '✅ League Invitation Accepted',
-          };
-          
-          await interaction.message.edit({ 
-            embeds: [updatedEmbed],
-            components: [] // Remove buttons
-          });
-        } catch (error) {
-          console.error('Error handling league join:', error);
-          await interaction.editReply({ content: 'There was an error joining the league. Please try again later.' });
-        }
-        return;
-      }
-      
-      // If we get here, it's an unknown button type
-      await interaction.reply({ content: 'Unknown button action', ephemeral: true });
-    } catch (error) {
-      console.error(`Error handling button interaction: ${error}`);
-      try {
-        if (interaction.deferred) {
-          await interaction.editReply({ content: 'An error occurred while processing the button' });
-        } else {
-          await interaction.reply({ content: 'An error occurred while processing the button', ephemeral: true });
-        }
-      } catch (replyError) {
-        console.error('Error sending error response:', replyError);
-      }
-    }
-    return;
-  }
-
-  // Handle autocomplete interactions
-  if (interaction.isAutocomplete()) {
-    const commandName = interaction.commandName;
-    const command = commands.get(commandName);
-
-    if (!command || !command.autocomplete) {
-      console.error(`No autocomplete handler for ${commandName}`);
-      return;
-    }
-
-    try {
-      await command.autocomplete(interaction);
-    } catch (error) {
-      console.error(`Error handling autocomplete for ${commandName}:`, error);
-    }
-    return;
-  }
-
-  // Handle command interactions
-  if (!interaction.isChatInputCommand()) return;
-
-  // Log the interaction
-  console.log(`Processing interaction: ${interaction.id}, type: ${interaction.type}`);
-  
-  const commandName = interaction.commandName;
-  console.log(`Looking up command handler for: ${commandName}`);
-  const command = commands.get(commandName);
-
-  if (!command) {
-    console.error(`No command matching ${commandName} was found.`);
-    console.log('Available commands:', Array.from(commands.keys()).join(', '));
-    await interaction.reply({ content: 'Unknown command!', ephemeral: true });
-    return;
-  }
-
   try {
-    // Always defer the reply first
-    console.log(`Deferring reply for interaction ${interaction.id}`);
-    await interaction.deferReply();
-
-    // Execute the command
-    console.log(`Executing command: ${commandName}`);
-    await command.execute(interaction);
+    if (interaction.isChatInputCommand()) {
+      // Handle slash commands
+      await handleSlashCommand(interaction);
+    } else if (interaction.isButton()) {
+      // Handle button interactions
+      await handleButtonInteraction(interaction);
+    } else if (interaction.isModalSubmit()) {
+      // Handle modal submissions
+      await handleModalSubmit(interaction);
+    } else if (interaction.isStringSelectMenu()) {
+      // Handle select menu interactions
+      await handleSelectMenuInteraction(interaction);
+    } else if (interaction.isAutocomplete()) {
+      // Handle autocomplete interactions
+      await handleAutocomplete(interaction);
+    }
   } catch (error) {
-    console.error(`Error executing ${commandName}:`, error);
+    console.error('Error handling interaction:', error);
     
+    // Try to respond to the interaction if it hasn't been responded to yet
     try {
-      const errorMessage = 'There was an error while executing this command!';
-      
-      if (interaction.deferred) {
-        await interaction.editReply({ content: errorMessage });
-      } else if (!interaction.replied) {
-        await interaction.reply({ content: errorMessage, ephemeral: true });
+      if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+        await interaction.reply({ 
+          content: 'There was an error while executing this command!', 
+          ephemeral: true 
+        });
+      } else if (interaction.isRepliable() && !interaction.replied && interaction.deferred) {
+        await interaction.editReply('There was an error while executing this command!');
       }
-    } catch (e) {
-      console.error('Error sending error message:', e);
+    } catch (replyError) {
+      console.error('Error replying to interaction after error:', replyError);
     }
   }
 });
+
+// Handle slash commands
+async function handleSlashCommand(interaction: ChatInputCommandInteraction) {
+  const command = commands.get(interaction.commandName);
+  
+  if (!command) {
+    console.error(`No command matching ${interaction.commandName} was found.`);
+    return interaction.reply({ 
+      content: `No command matching ${interaction.commandName} was found.`, 
+      ephemeral: true 
+    });
+  }
+  
+  // Defer reply to give us time to process
+  await interaction.deferReply();
+  
+  try {
+    // Log command usage with deployment type info
+    const deploymentType = command.deploymentType || 'unknown';
+    console.log(`Executing command: ${interaction.commandName} (${deploymentType} command) for user: ${interaction.user.tag}`);
+    
+    // Execute the command
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(`Error executing ${interaction.commandName}:`, error);
+    
+    if (interaction.replied || interaction.deferred) {
+      await interaction.editReply({ content: 'There was an error while executing this command!' });
+    } else {
+      await interaction.reply({ 
+        content: 'There was an error while executing this command!', 
+        ephemeral: true 
+      });
+    }
+  }
+}
+
+// Handle button interactions
+async function handleButtonInteraction(interaction: ButtonInteraction) {
+  console.log(`Processing button interaction: ${interaction.customId}`);
+  const customId = interaction.customId;
+  
+  try {
+    // Handle match-related buttons
+    if (customId.startsWith('match_accept:')) {
+      const [_, matchId] = customId.split(':');
+      await handleMatchAccept(interaction, matchId);
+      return;
+    }
+    
+    if (customId.startsWith('match_decline:')) {
+      const [_, matchId] = customId.split(':');
+      await handleMatchDecline(interaction, matchId);
+      return;
+    }
+    
+    if (customId.startsWith('match_confirm:')) {
+      const [_, matchId] = customId.split(':');
+      await handleMatchConfirm(interaction, matchId);
+      return;
+    }
+    
+    if (customId.startsWith('match_report:')) {
+      const [_, matchId] = customId.split(':');
+      await handleMatchReport(interaction, matchId);
+      return;
+    }
+    
+    if (customId.startsWith('match_cancel:')) {
+      const [_, matchId] = customId.split(':');
+      await handleMatchCancel(interaction, matchId);
+      return;
+    }
+    
+    // Handle league join buttons
+    if (customId.startsWith('join_league:')) {
+      await interaction.deferReply({ ephemeral: true });
+      
+      try {
+        const [_, leagueName, targetUserId] = customId.split(':');
+        
+        // Verify the user clicking is the invited user
+        if (interaction.user.id !== targetUserId) {
+          await interaction.editReply({ content: 'This invitation is for someone else.' });
+          return;
+        }
+        
+        // Get the guild ID from the interaction
+        const guildId = interaction.guildId;
+        if (!guildId) {
+          await interaction.editReply({ content: 'This command can only be used in a server.' });
+          return;
+        }
+        
+        // Add the player to the league
+        await db.addPlayerToLeague(interaction.user.id, interaction.user.username, leagueName, guildId);
+        
+        // Create success message
+        await interaction.editReply({ 
+          content: `✅ You've successfully joined **${leagueName}**! Check your status with \`/status\`.`
+        });
+        
+        // Update the original message to show the invitation was accepted
+        const originalEmbed = interaction.message.embeds[0];
+        const updatedEmbed = {
+          ...originalEmbed.data,
+          color: 0x00FF00, // Green color
+          title: '✅ League Invitation Accepted',
+        };
+        
+        await interaction.message.edit({ 
+          embeds: [updatedEmbed],
+          components: [] // Remove buttons
+        });
+      } catch (error) {
+        console.error('Error handling league join:', error);
+        await interaction.editReply({ content: 'There was an error joining the league. Please try again later.' });
+      }
+      return;
+    }
+    
+    // If we get here, it's an unknown button type
+    await interaction.reply({ content: 'Unknown button action', ephemeral: true });
+  } catch (error) {
+    console.error(`Error handling button interaction: ${error}`);
+    try {
+      if (interaction.deferred) {
+        await interaction.editReply({ content: 'An error occurred while processing the button' });
+      } else {
+        await interaction.reply({ content: 'An error occurred while processing the button', ephemeral: true });
+      }
+    } catch (replyError) {
+      console.error('Error sending error response:', replyError);
+    }
+  }
+  return;
+}
+
+// Handle modal submissions
+async function handleModalSubmit(interaction: Interaction) {
+  if (!interaction.isModalSubmit()) return;
+  
+  const [action, id] = interaction.customId.split(':');
+  
+  if (action === 'report_match') {
+    try {
+      await interaction.deferReply();
+      
+      const yourScore = parseInt(interaction.fields.getTextInputValue('your_score'));
+      const opponentScore = parseInt(interaction.fields.getTextInputValue('opponent_score'));
+      
+      if (isNaN(yourScore) || isNaN(opponentScore) || yourScore < 0 || opponentScore < 0) {
+        return interaction.editReply('Invalid scores. Please enter positive numbers only.');
+      }
+      
+      if (yourScore === opponentScore) {
+        return interaction.editReply('Scores cannot be equal. There must be a winner.');
+      }
+      
+      // Get match details first to determine player positions
+      const matchBefore = await db.getMatch(id);
+      
+      if (!matchBefore) {
+        return interaction.editReply('Match not found.');
+      }
+      
+      // Check if user is a participant
+      const isPlayer1 = matchBefore.player1Id === interaction.user.id;
+      const isPlayer2 = matchBefore.player2Id === interaction.user.id;
+      
+      if (!isPlayer1 && !isPlayer2) {
+        return interaction.editReply('You are not a participant in this match.');
+      }
+      
+      // Determine which score belongs to which player
+      let player1Score, player2Score;
+      
+      if (isPlayer1) {
+        player1Score = yourScore;
+        player2Score = opponentScore;
+      } else {
+        player1Score = opponentScore;
+        player2Score = yourScore;
+      }
+      
+      // Report the result
+      const updatedMatch = await db.reportMatchResult(
+        id,
+        interaction.user.id,
+        player1Score,
+        player2Score
+      );
+      
+      // Get enriched match with player details
+      const enrichedMatch = await db.getMatch(id);
+      const winner = player1Score > player2Score ? enrichedMatch.player1 : enrichedMatch.player2;
+      const loser = player1Score > player2Score ? enrichedMatch.player2 : enrichedMatch.player1;
+      const winnerScore = player1Score > player2Score ? player1Score : player2Score;
+      const loserScore = player1Score > player2Score ? player2Score : player1Score;
+      
+      // Create embed
+      const embed = new EmbedBuilder()
+        .setColor('#00ff00')
+        .setTitle('Match Result Reported')
+        .setDescription(`Match in ${enrichedMatch.league.name} has been completed!`)
+        .addFields(
+          { name: 'Winner', value: `<@${winner.discordId}> (${winnerScore})`, inline: true },
+          { name: 'Loser', value: `<@${loser.discordId}> (${loserScore})`, inline: true },
+          { name: 'New ELO', value: `${winner.username}: ${winner.elo} (+${winnerScore - loserScore})\n${loser.username}: ${loser.elo} (-${winnerScore - loserScore})`, inline: false }
+        );
+      
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      console.error(`Error handling match report: ${error}`);
+      await interaction.editReply('An error occurred while reporting the match result.');
+    }
+  }
+}
+
+// Handle select menu interactions
+async function handleSelectMenuInteraction(interaction: Interaction) {
+  // Not implemented
+}
+
+// Handle autocomplete interactions
+async function handleAutocomplete(interaction: Interaction) {
+  // Not implemented
+}
 
 // Match button handlers
 async function handleMatchAccept(interaction: ButtonInteraction, matchId: string) {
@@ -333,87 +436,6 @@ async function handleMatchCancel(interaction: ButtonInteraction, matchId: string
     await interaction.editReply(`Error cancelling match: ${error.message}`);
   }
 }
-
-// Handle modal submissions
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isModalSubmit()) return;
-  
-  const [action, id] = interaction.customId.split(':');
-  
-  if (action === 'report_match') {
-    try {
-      await interaction.deferReply();
-      
-      const yourScore = parseInt(interaction.fields.getTextInputValue('your_score'));
-      const opponentScore = parseInt(interaction.fields.getTextInputValue('opponent_score'));
-      
-      if (isNaN(yourScore) || isNaN(opponentScore) || yourScore < 0 || opponentScore < 0) {
-        return interaction.editReply('Invalid scores. Please enter positive numbers only.');
-      }
-      
-      if (yourScore === opponentScore) {
-        return interaction.editReply('Scores cannot be equal. There must be a winner.');
-      }
-      
-      // Get match details first to determine player positions
-      const matchBefore = await db.getMatch(id);
-      
-      if (!matchBefore) {
-        return interaction.editReply('Match not found.');
-      }
-      
-      // Check if user is a participant
-      const isPlayer1 = matchBefore.player1Id === interaction.user.id;
-      const isPlayer2 = matchBefore.player2Id === interaction.user.id;
-      
-      if (!isPlayer1 && !isPlayer2) {
-        return interaction.editReply('You are not a participant in this match.');
-      }
-      
-      // Determine which score belongs to which player
-      let player1Score, player2Score;
-      
-      if (isPlayer1) {
-        player1Score = yourScore;
-        player2Score = opponentScore;
-      } else {
-        player1Score = opponentScore;
-        player2Score = yourScore;
-      }
-      
-      // Report the result
-      const updatedMatch = await db.reportMatchResult(
-        id,
-        interaction.user.id,
-        player1Score,
-        player2Score
-      );
-      
-      // Get enriched match with player details
-      const enrichedMatch = await db.getMatch(id);
-      const winner = player1Score > player2Score ? enrichedMatch.player1 : enrichedMatch.player2;
-      const loser = player1Score > player2Score ? enrichedMatch.player2 : enrichedMatch.player1;
-      const winnerScore = player1Score > player2Score ? player1Score : player2Score;
-      const loserScore = player1Score > player2Score ? player2Score : player1Score;
-      
-      // Create embed
-      const embed = new EmbedBuilder()
-        .setColor('#00ff00')
-        .setTitle('Match Result Reported')
-        .setDescription(`Match in ${enrichedMatch.league.name} has been completed!`)
-        .addFields(
-          { name: 'Winner', value: `<@${winner.discordId}> (${winnerScore})`, inline: true },
-          { name: 'Loser', value: `<@${loser.discordId}> (${loserScore})`, inline: true },
-          { name: 'New ELO', value: `${winner.username}: ${winner.elo} (+${winnerScore - loserScore})\n${loser.username}: ${loser.elo} (-${winnerScore - loserScore})`, inline: false }
-        );
-      
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error) {
-      console.error(`Error handling match report: ${error}`);
-      await interaction.editReply('An error occurred while reporting the match result.');
-    }
-  }
-});
 
 // Initialize database and start bot
 async function main() {

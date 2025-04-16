@@ -90,7 +90,18 @@ async function deployCommands(isGlobal = false, cleanup = false) {
         }
 
         // Get command data
-        const commandData = Array.from(commands.values()).map(command => command.data.toJSON());
+        const commandData = Array.from(commands.values()).map(command => {
+            // Store deployment type in command metadata
+            const commandJson = command.data.toJSON();
+            
+            // Add metadata to indicate if this is a global or guild command
+            // This won't affect the Discord API, but will be stored in our local command registry
+            if (command.deploymentType === undefined) {
+                command.deploymentType = isGlobal ? 'global' : 'guild';
+            }
+            
+            return commandJson;
+        });
 
         if (isGlobal) {
             // Register commands globally
