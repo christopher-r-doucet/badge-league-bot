@@ -33,32 +33,35 @@ async function paginateMatches(interaction: ButtonInteraction | ChatInputCommand
         }
       }
 
+      // Defensive check for match.status
+      const matchStatus = match.status || 'Unknown';
       // Format date
       const dateInfo = match.scheduledDate 
         ? formatDate(match.scheduledDate) 
         : 'Instant match (no scheduled date)';
-
-      // Confirmation status
-      const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
-      const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
+      // Defensive checks for confirmation fields
+      const player1Confirmed = typeof match.player1Confirmed === 'boolean' ? (match.player1Confirmed ? '✅' : '❌') : '❓';
+      const player2Confirmed = typeof match.player2Confirmed === 'boolean' ? (match.player2Confirmed ? '✅' : '❌') : '❓';
       const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
-
       // Get match status with confirmation details
-      let matchStatusDisplay = match.status;
-      if (match.status === MatchStatus.SCHEDULED) {
+      let matchStatusDisplay = matchStatus;
+      if (matchStatus === MatchStatus.SCHEDULED) {
         if (match.player1Confirmed === true && match.player2Confirmed === true) {
           matchStatusDisplay = 'Ready to play';
         } else {
           matchStatusDisplay = 'Waiting for acceptance';
         }
       }
-
       // Get league name
-      const leagueInfo = match.league ? `League: ${match.league.name}` : `League ID: ${match.leagueId}`;
-
+      let leagueInfo = 'No league';
+      if (match.league && match.league.name) {
+        leagueInfo = `League: ${match.league.name}`;
+      } else if (match.leagueId) {
+        leagueInfo = `League ID: ${match.leagueId}`;
+      }
       // Add per-match cancel button if active/upcoming
       let components = [];
-      if (match.status === MatchStatus.SCHEDULED) {
+      if (matchStatus === MatchStatus.SCHEDULED) {
         components.push(
           new ButtonBuilder()
             .setCustomId(`cancel_match:${match.id}`)
@@ -66,10 +69,11 @@ async function paginateMatches(interaction: ButtonInteraction | ChatInputCommand
             .setStyle(ButtonStyle.Danger)
         );
       }
-
+      // Defensive check for match.id
+      const matchIdDisplay = match.id ? `\`${String(match.id).substring(0, 8)}...\`` : '`Unknown ID`';
       embed.addFields({
         name: `Match #${start + i + 1}`,
-        value: `**Opponent**: ${opponentDisplay}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+        value: `**Opponent**: ${opponentDisplay}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: ${matchIdDisplay}`,
         inline: false
       });
 
@@ -83,7 +87,7 @@ async function paginateMatches(interaction: ButtonInteraction | ChatInputCommand
         row.addComponents(...components);
       }
     } catch (error) {
-      console.error(`Error processing match:`, error);
+      console.error(`Error processing match:`, error, match);
       // Skip this match if there's an error
     }
   });
