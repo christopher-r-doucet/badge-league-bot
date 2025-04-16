@@ -310,16 +310,31 @@ const reportResultCommand: Command = {
           .setTitle('Match Result Reported')
           .setDescription(`The result for match in **${matchBefore.league?.name || 'Unknown League'}** has been reported.`)
           .addFields(
-            { name: 'Players', value: `<@${match.player1Id}> vs <@${match.player2Id}>`, inline: false },
-            { name: 'Winner', value: `<@${didWin ? interaction.user.id : opponentId}>`, inline: true },
-            { name: 'Reported By', value: `<@${interaction.user.id}>`, inline: true }
+            { 
+              name: 'Players', 
+              value: `${matchBefore.player1?.username || 'Unknown player'} vs ${matchBefore.player2?.username || 'Unknown player'}`, 
+              inline: false 
+            },
+            { 
+              name: 'Winner', 
+              value: didWin ? interaction.user.username : opponentName, 
+              inline: true 
+            },
+            { 
+              name: 'Reported By', 
+              value: interaction.user.username, 
+              inline: true 
+            }
           );
         
         // Add ELO changes if available
         if (match.player1EloChange !== undefined && match.player2EloChange !== undefined) {
+          const player1Name = matchBefore.player1?.username || 'Player 1';
+          const player2Name = matchBefore.player2?.username || 'Player 2';
+          
           embed.addFields({
             name: 'ELO Changes',
-            value: `<@${match.player1Id}>: ${match.player1EloChange > 0 ? '+' : ''}${match.player1EloChange}\n<@${match.player2Id}>: ${match.player2EloChange > 0 ? '+' : ''}${match.player2EloChange}`,
+            value: `${player1Name}: ${match.player1EloChange > 0 ? '+' : ''}${match.player1EloChange}\n${player2Name}: ${match.player2EloChange > 0 ? '+' : ''}${match.player2EloChange}`,
             inline: false
           });
         }
