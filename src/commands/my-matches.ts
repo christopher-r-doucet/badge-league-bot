@@ -11,7 +11,7 @@ import type { Command } from '../types/commands.js';
 const myMatchesCommand: Command = {
   data: new SlashCommandBuilder()
     .setName('my_matches')
-    .setDescription('View My Matches (upcoming and completed)')
+    .setDescription('View My Matches (upcoming and completed) [Guild]')
     .addStringOption(option => 
       option.setName('league')
         .setDescription('The league to view matches for')
