@@ -332,9 +332,21 @@ const reportResultCommand: Command = {
           const player1Name = matchBefore.player1?.username || 'Player 1';
           const player2Name = matchBefore.player2?.username || 'Player 2';
           
+          // Format ELO changes with colors and emojis
+          const player1EloNew = (matchBefore.player1?.elo || 0) + match.player1EloChange;
+          const player2EloNew = (matchBefore.player2?.elo || 0) + match.player2EloChange;
+          
+          const player1ChangeText = match.player1EloChange > 0 
+            ? `🟢 ${player1Name}: ${player1EloNew}(+${match.player1EloChange})` 
+            : `🔴 ${player1Name}: ${player1EloNew}(${match.player1EloChange})`;
+            
+          const player2ChangeText = match.player2EloChange > 0 
+            ? `🟢 ${player2Name}: ${player2EloNew}(+${match.player2EloChange})` 
+            : `🔴 ${player2Name}: ${player2EloNew}(${match.player2EloChange})`;
+          
           embed.addFields({
-            name: 'ELO Changes',
-            value: `${player1Name}: ${match.player1EloChange > 0 ? '+' : ''}${match.player1EloChange}\n${player2Name}: ${match.player2EloChange > 0 ? '+' : ''}${match.player2EloChange}`,
+            name: 'New ELO',
+            value: `${player1ChangeText}\n${player2ChangeText}`,
             inline: false
           });
         }
