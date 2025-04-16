@@ -337,12 +337,12 @@ const reportResultCommand: Command = {
           const player2EloNew = (matchBefore.player2?.elo || 0) + match.player2EloChange;
           
           const player1ChangeText = match.player1EloChange > 0 
-            ? `🟢 ${player1Name}: ${player1EloNew}(+${match.player1EloChange})` 
-            : `🔴 ${player1Name}: ${player1EloNew}(${match.player1EloChange})`;
+            ? `📈 ${player1Name}: ${player1EloNew}(+${match.player1EloChange})` 
+            : `📉 ${player1Name}: ${player1EloNew}(${match.player1EloChange})`;
             
           const player2ChangeText = match.player2EloChange > 0 
-            ? `🟢 ${player2Name}: ${player2EloNew}(+${match.player2EloChange})` 
-            : `🔴 ${player2Name}: ${player2EloNew}(${match.player2EloChange})`;
+            ? `📈 ${player2Name}: ${player2EloNew}(+${match.player2EloChange})` 
+            : `📉 ${player2Name}: ${player2EloNew}(${match.player2EloChange})`;
           
           embed.addFields({
             name: 'New ELO',
