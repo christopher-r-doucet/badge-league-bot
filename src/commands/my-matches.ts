@@ -130,6 +130,9 @@ const myMatchesCommand = {
       }
       const activeMatches = matches.filter(match => match.status !== MatchStatus.COMPLETED && match.status !== MatchStatus.CANCELLED);
       console.log('[my_matches] active matches:', activeMatches);
+      if (activeMatches.length === 0) {
+        return interaction.editReply({ content: 'You have no active matches in this server.' });
+      }
       await paginateMatches(interaction, activeMatches, 0);
     } catch (error) {
       console.error('[my_matches] Failed to load matches:', error);
