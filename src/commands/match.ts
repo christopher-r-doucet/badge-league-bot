@@ -27,17 +27,22 @@ async function handleMatchIdAutocomplete(interaction: AutocompleteInteraction) {
   const guildId = interaction.guildId || undefined;
   
   try {
+    console.log(`Autocomplete request for match_id from user ${userId} in guild ${guildId || 'DM'}`);
+    
     // Get all matches for this user (without status filter to include all matches)
     const matches = await db.getPlayerMatches(userId, undefined, guildId);
     
-    // Filter to show matches that are ready for reporting results
-    // This includes scheduled matches that are confirmed by both players
-    const readyMatches = matches.filter((match) => 
-      // Only include matches in SCHEDULED status that are confirmed by both players
-      match.status === MatchStatus.SCHEDULED && 
-      match.player1Confirmed && 
-      match.player2Confirmed
-    );
+    console.log(`Retrieved ${matches.length} total matches for user ${userId}`);
+    
+    // Log details of each match for debugging
+    matches.forEach((match, index) => {
+      console.log(`Match ${index + 1}: ID=${match.id}, Status=${match.status}, Player1Confirmed=${match.player1Confirmed}, Player2Confirmed=${match.player2Confirmed}`);
+    });
+    
+    // For testing purposes, show all matches regardless of status
+    const readyMatches = matches;
+    
+    console.log(`Using ${readyMatches.length} matches for autocomplete (all matches for testing)`);
     
     // Filter and format matches for autocomplete
     const filtered = readyMatches
@@ -59,11 +64,12 @@ async function handleMatchIdAutocomplete(interaction: AutocompleteInteraction) {
         const shortId = match.id.substring(0, 8);
         
         return {
-          name: `Match vs ${opponentName} (${matchDate}) - ID: ${shortId}`,
+          name: `Match vs ${opponentName} - ID: ${shortId} (${match.status})`,
           value: match.id
         };
       });
     
+    console.log(`Returning ${filtered.length} matches for autocomplete`);
     await interaction.respond(filtered);
   } catch (error) {
     console.error('Error in match ID autocomplete:', error);
