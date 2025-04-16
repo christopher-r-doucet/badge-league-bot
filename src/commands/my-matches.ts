@@ -16,14 +16,22 @@ async function paginateMatches(interaction: ButtonInteraction | ChatInputCommand
   const embed = new EmbedBuilder()
     .setTitle('Your Matches')
     .setDescription(`Page ${page + 1} of ${Math.ceil(matches.length / 5)}`);
+  const row = new ActionRowBuilder<ButtonBuilder>();
   paginated.forEach((match, i) => {
     try {
       if (!match) return; // Skip if match is undefined
       
-      // Safely determine opponent
+      // Safely determine opponent and display names/mentions
       const isPlayer1 = match.player1 && match.player1.discordId === interaction.user.id;
       const opponent = isPlayer1 ? match.player2 : match.player1;
-      const opponentName = opponent && opponent.username ? opponent.username : 'Unknown player';
+      let opponentDisplay = 'Unknown player';
+      if (opponent) {
+        if (opponent.username) {
+          opponentDisplay = opponent.username;
+        } else if (opponent.discordId) {
+          opponentDisplay = `<@${opponent.discordId}>`;
+        }
+      }
 
       // Format date
       const dateInfo = match.scheduledDate 
@@ -48,17 +56,37 @@ async function paginateMatches(interaction: ButtonInteraction | ChatInputCommand
       // Get league name
       const leagueInfo = match.league ? `League: ${match.league.name}` : `League ID: ${match.leagueId}`;
 
+      // Add per-match cancel button if active/upcoming
+      let components = [];
+      if (match.status === MatchStatus.SCHEDULED) {
+        components.push(
+          new ButtonBuilder()
+            .setCustomId(`cancel_match:${match.id}`)
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Danger)
+        );
+      }
+
       embed.addFields({
         name: `Match #${start + i + 1}`,
-        value: `**Opponent**: ${opponentName}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+        value: `**Opponent**: ${opponentDisplay}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
         inline: false
       });
+
+      // Add a row for the cancel button if present
+      if (components.length) {
+        embed.addFields({
+          name: '\u200B',
+          value: '\u200B',
+          inline: false
+        });
+        row.addComponents(...components);
+      }
     } catch (error) {
       console.error(`Error processing match:`, error);
       // Skip this match if there's an error
     }
   });
-  const row = new ActionRowBuilder<ButtonBuilder>();
   if (page > 0) row.addComponents(new ButtonBuilder().setCustomId('prev_page').setLabel('Previous').setStyle(ButtonStyle.Secondary));
   if (end < matches.length) row.addComponents(new ButtonBuilder().setCustomId('next_page').setLabel('Next').setStyle(ButtonStyle.Secondary));
   await interaction.editReply({ embeds: [embed], components: row.components.length ? [row] : [] });
@@ -74,18 +102,18 @@ const myMatchesCommand: Command = {
         .setRequired(false)
         .setAutocomplete(true)
     ) as unknown as SlashCommandBuilder,
-    
+  deploymentType: 'global',
   async execute(interaction: ChatInputCommandInteraction) {
     try {
-      // Don't defer reply here since it's already deferred in index.ts
-      
+      // Always defer reply as ephemeral
+      await interaction.deferReply({ ephemeral: true });
       const guildId = interaction.guildId || undefined;
       
       // Use the new database structure
       const matches = await db.getPlayerMatches(interaction.user.id, undefined, guildId);
       
       if (!matches || matches.length === 0) {
-        return interaction.editReply('You have no matches in this server.');
+        return interaction.editReply({ content: 'You have no matches in this server.' });
       }
       
       // Only show active/upcoming matches by default
@@ -94,7 +122,7 @@ const myMatchesCommand: Command = {
       // Start at page 0
       await paginateMatches(interaction, activeMatches, 0);
     } catch (error) {
-      await interaction.editReply('Failed to load matches.');
+      await interaction.editReply({ content: 'Failed to load matches.' });
     }
   },
 
@@ -108,7 +136,26 @@ const myMatchesCommand: Command = {
     if (interaction.customId === 'prev_page') page--;
     await paginateMatches(interaction, activeMatches, page);
     await interaction.deferUpdate();
-  }
+  },
+
+  cancelMatch: async function(interaction: ButtonInteraction, matchId: string) {
+    try {
+      await db.cancelMatch(matchId, interaction.user.id);
+      // Refresh the match list for the user (keep ephemeral)
+      const guildId = interaction.guildId || undefined;
+      const matches = await db.getPlayerMatches(interaction.user.id, undefined, guildId);
+      const activeMatches = matches.filter(match => match.status !== MatchStatus.COMPLETED && match.status !== MatchStatus.CANCELLED);
+      await interaction.update({
+        content: 'Match cancelled.',
+        embeds: [],
+        components: []
+      });
+      // Show updated match list
+      await paginateMatches(interaction, activeMatches, 0);
+    } catch (error) {
+      await interaction.reply({ content: 'Failed to cancel match.', ephemeral: true });
+    }
+  },
 };
 
 export default myMatchesCommand;

@@ -77,6 +77,7 @@ const scheduleMatchCommand: Command = {
         .setDescription('Time of the match (HH:MM) - not needed for instant matches')
         .setRequired(false)
     ) as unknown as SlashCommandBuilder,
+  deploymentType: 'global',
   
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
@@ -231,6 +232,7 @@ const reportResultCommand: Command = {
         .setDescription('Did you win the match?')
         .setRequired(true)
     ) as unknown as SlashCommandBuilder,
+  deploymentType: 'global',
   
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
@@ -343,6 +345,7 @@ const viewMatchesCommand: Command = {
         .setRequired(true)
         .setAutocomplete(true)
     ) as unknown as SlashCommandBuilder,
+  deploymentType: 'global',
   
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
@@ -430,6 +433,7 @@ const cancelMatchCommand: Command = {
         .setRequired(true)
         .setAutocomplete(true)
     ) as unknown as SlashCommandBuilder,
+  deploymentType: 'global',
   
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);

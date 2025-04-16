@@ -62,7 +62,7 @@ const playerStatusCommand = {
                 .setDescription('The league to show stats for (defaults to your default league)')
                 .setRequired(false)
                 .setAutocomplete(true)),
-
+    deploymentType: 'global',
     async autocomplete(interaction: AutocompleteInteraction) {
         const focusedOption = interaction.options.getFocused(true);
         if (focusedOption.name === 'league') {

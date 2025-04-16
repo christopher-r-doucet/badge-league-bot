@@ -5,6 +5,7 @@ const helpCommand = {
   data: new SlashCommandBuilder()
     .setName('help')
     .setDescription('Shows Information About the Bot and Available Commands'),
+  deploymentType: 'global',
   
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;

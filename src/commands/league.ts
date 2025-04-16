@@ -56,6 +56,7 @@ const createLeagueCommand = {
         .setRequired(true)
         .setMinLength(1)
         .setMaxLength(50)),
+  deploymentType: 'global',
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
 
@@ -117,6 +118,7 @@ const joinLeagueCommand = {
         .setDescription('The name of the league')
         .setRequired(true)
         .setAutocomplete(true)),
+  deploymentType: 'global',
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
     if (focusedOption.name === 'league') {
@@ -166,6 +168,7 @@ const listLeaguesCommand = {
   data: new SlashCommandBuilder()
     .setName('list_leagues')
     .setDescription('List All Available Leagues'),
+  deploymentType: 'global',
   async execute(interaction: CommandInteraction) {
     if (!interaction.isChatInputCommand()) return;
 
@@ -239,6 +242,7 @@ const leagueStandingsCommand = {
         .setDescription('The name of the league')
         .setRequired(true)
         .setAutocomplete(true)),
+  deploymentType: 'global',
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
     if (focusedOption.name === 'league') {
@@ -339,6 +343,7 @@ const inviteToLeagueCommand = {
       option.setName('player')
         .setDescription('The player to invite')
         .setRequired(true)),
+  deploymentType: 'global',
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
     if (focusedOption.name === 'league') {
@@ -423,14 +428,13 @@ const leaveLeagueCommand = {
         .setRequired(true)
         .setAutocomplete(true)
     ),
-    
+  deploymentType: 'global',
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
     if (focusedOption.name === 'league') {
       await handleLeagueAutocomplete(interaction, true); // true = only show leagues the player is in
     }
   },
-  
   async execute(interaction: ChatInputCommandInteraction) {
     try {
       // Don't defer reply here since it's already deferred in index.ts
@@ -489,7 +493,7 @@ const deleteLeagueCommand = {
         .setDescription('Confirm that you want to delete this league')
         .setRequired(true)
     ),
-    
+  deploymentType: 'global',
   async autocomplete(interaction: AutocompleteInteraction) {
     const focusedOption = interaction.options.getFocused(true);
     if (focusedOption.name === 'league') {
@@ -521,7 +525,6 @@ const deleteLeagueCommand = {
       }
     }
   },
-  
   async execute(interaction: ChatInputCommandInteraction) {
     try {
       // Don't defer reply here since it's already deferred in index.ts
