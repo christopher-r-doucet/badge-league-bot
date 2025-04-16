@@ -294,9 +294,11 @@ const reportResultCommand: Command = {
         const isPlayer1 = matchBefore.player1Id === interaction.user.id;
         
         if ((isPlayer1 && didWin) || (!isPlayer1 && !didWin)) {
+          // If user is player1 and won, or user is player2 and lost
           player1Score = 1;
           player2Score = 0;
         } else {
+          // If user is player1 and lost, or user is player2 and won
           player1Score = 0;
           player2Score = 1;
         }
@@ -317,7 +319,9 @@ const reportResultCommand: Command = {
             },
             { 
               name: 'Winner', 
-              value: didWin ? interaction.user.username : opponentName, 
+              value: match.winnerId === matchBefore.player1Id 
+                ? matchBefore.player1?.username || 'Unknown player'
+                : matchBefore.player2?.username || 'Unknown player', 
               inline: true 
             },
             { 
