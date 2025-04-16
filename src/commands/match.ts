@@ -248,7 +248,7 @@ const reportResultCommand: Command = {
     .setDescription('Report the Result of a completed match')
     .addStringOption(option => 
       option.setName('match_id')
-        .setDescription('ID of the match')
+        .setDescription('ID of the match to report')
         .setRequired(true)
         .setAutocomplete(true)
     )
@@ -288,10 +288,6 @@ const reportResultCommand: Command = {
           return interaction.editReply('You are not a participant in this match.');
         }
         
-        // Determine winner ID based on who reported and if they won
-        const winnerId = didWin ? interaction.user.id : 
-                        (isPlayer1 ? matchBefore.player2?.discordId : matchBefore.player1?.discordId);
-        
         // Determine scores (1 for winner, 0 for loser)
         let player1Score = 0;
         let player2Score = 0;
@@ -313,6 +309,10 @@ const reportResultCommand: Command = {
         if (!enrichedMatch) {
           return interaction.editReply('Failed to retrieve match details after reporting result.');
         }
+        
+        // Determine winner ID based on who reported and if they won
+        const winnerId = didWin ? interaction.user.id : 
+                        (isPlayer1 ? matchBefore.player2?.discordId : matchBefore.player1?.discordId);
         
         // Create embed
         const embed = new EmbedBuilder()
@@ -466,13 +466,13 @@ const myMatchesCommand: Command = {
       // Get all matches for this user
       const matches = await db.getPlayerMatches(interaction.user.id, undefined, guildId);
       
-      if (matches.length === 0) {
+      if (!matches || matches.length === 0) {
         return interaction.editReply('You have no matches in this server.');
       }
       
       // Filter matches by status
-      const scheduledMatches = matches.filter(match => match.status === MatchStatus.SCHEDULED);
-      const completedMatches = matches.filter(match => match.status === MatchStatus.COMPLETED);
+      const scheduledMatches = matches.filter(match => match && match.status === MatchStatus.SCHEDULED);
+      const completedMatches = matches.filter(match => match && match.status === MatchStatus.COMPLETED);
       
       if (scheduledMatches.length === 0 && completedMatches.length === 0) {
         return interaction.editReply('You have no matches.');
@@ -497,6 +497,8 @@ const myMatchesCommand: Command = {
         // Add each scheduled match
         scheduledMatches.forEach((match, index) => {
           try {
+            if (!match) return; // Skip if match is undefined
+            
             // Safely determine opponent
             const isPlayer1 = match.player1 && match.player1.discordId === interaction.user.id;
             const opponent = isPlayer1 ? match.player2 : match.player1;
@@ -523,7 +525,7 @@ const myMatchesCommand: Command = {
             }
 
             // Get league name
-            const leagueInfo = `League ID: ${match.leagueId}`;
+            const leagueInfo = match.league ? `League: ${match.league.name}` : `League ID: ${match.leagueId}`;
 
             embed.addFields({
               name: `Match #${index + 1}`,
@@ -531,7 +533,7 @@ const myMatchesCommand: Command = {
               inline: false
             });
           } catch (error) {
-            console.error(`Error processing match ${match.id}:`, error);
+            console.error(`Error processing match:`, error);
             // Skip this match if there's an error
           }
         });
@@ -551,6 +553,8 @@ const myMatchesCommand: Command = {
           .slice(0, 5)
           .forEach((match, index) => {
             try {
+              if (!match) return; // Skip if match is undefined
+              
               // Safely determine opponent and result
               const isPlayer1 = match.player1 && match.player1.discordId === interaction.user.id;
               const opponent = isPlayer1 ? match.player2 : match.player1;
@@ -563,7 +567,7 @@ const myMatchesCommand: Command = {
                 : 'Unknown date';
 
               // Get league name
-              const leagueInfo = `League ID: ${match.leagueId}`;
+              const leagueInfo = match.league ? `League: ${match.league.name}` : `League ID: ${match.leagueId}`;
 
               embed.addFields({
                 name: `Match #${index + 1}`,
@@ -571,49 +575,59 @@ const myMatchesCommand: Command = {
                 inline: false
               });
             } catch (error) {
-              console.error(`Error processing completed match ${match.id}:`, error);
+              console.error(`Error processing completed match:`, error);
               // Skip this match if there's an error
             }
           });
       }
       
       // Add action buttons for the first match
-      const firstMatch = scheduledMatches[0];
-      const actionRow = new ActionRowBuilder<ButtonBuilder>();
-      
-      // Only add confirm button if the player hasn't confirmed yet
-      const isPlayer1 = firstMatch.player1 && firstMatch.player1.discordId === interaction.user.id;
-      const hasConfirmed = isPlayer1 ? firstMatch.player1Confirmed : firstMatch.player2Confirmed;
-      
-      if (!hasConfirmed) {
-        actionRow.addComponents(
-          new ButtonBuilder()
-            .setCustomId(`match_confirm:${firstMatch.id}`)
-            .setLabel('Confirm Match')
-            .setStyle(ButtonStyle.Success)
-        );
+      if (scheduledMatches.length > 0) {
+        const firstMatch = scheduledMatches[0];
+        
+        if (firstMatch) { // Check if firstMatch exists
+          const actionRow = new ActionRowBuilder<ButtonBuilder>();
+          
+          // Only add confirm button if the player hasn't confirmed yet
+          const isPlayer1 = firstMatch.player1 && firstMatch.player1.discordId === interaction.user.id;
+          const hasConfirmed = isPlayer1 ? firstMatch.player1Confirmed : firstMatch.player2Confirmed;
+          
+          if (!hasConfirmed) {
+            actionRow.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`match_confirm:${firstMatch.id}`)
+                .setLabel('Confirm Match')
+                .setStyle(ButtonStyle.Success)
+            );
+          }
+          
+          // Add report and cancel buttons
+          actionRow.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`match_report:${firstMatch.id}`)
+              .setLabel('Report Result')
+              .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+              .setCustomId(`match_cancel:${firstMatch.id}`)
+              .setLabel('Cancel Match')
+              .setStyle(ButtonStyle.Danger)
+          );
+          
+          // Only add components if we have any buttons
+          const replyOptions: any = { embeds: [embed] };
+          if (actionRow.components.length > 0) {
+            replyOptions.components = [actionRow];
+          }
+          
+          await interaction.editReply(replyOptions);
+        } else {
+          await interaction.editReply({ embeds: [embed] });
+        }
+      } else {
+        await interaction.editReply({ embeds: [embed] });
       }
-      
-      // Add report and cancel buttons
-      actionRow.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`match_report:${firstMatch.id}`)
-          .setLabel('Report Result')
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId(`match_cancel:${firstMatch.id}`)
-          .setLabel('Cancel Match')
-          .setStyle(ButtonStyle.Danger)
-      );
-      
-      // Only add components if we have any buttons
-      const replyOptions: any = { embeds: [embed] };
-      if (actionRow.components.length > 0) {
-        replyOptions.components = [actionRow];
-      }
-      
-      await interaction.editReply(replyOptions);
     } catch (error: any) {
+      console.error('Error in my_matches command:', error);
       await interaction.editReply(`Error viewing your matches: ${error.message}`);
     }
   }
