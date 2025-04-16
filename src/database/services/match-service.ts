@@ -266,12 +266,11 @@ export class MatchService implements IMatchService {
       match.winnerId = winner.id;
       match.loserId = loser.id;
 
-      // Update player stats
-      winner.wins += 1;
-      loser.losses += 1;
-
       // Calculate ELO changes
       const eloChange = this.calculateEloChange(winner.elo, loser.elo);
+      const player1EloBefore = player1.elo;
+      const player2EloBefore = player2.elo;
+
       winner.elo += eloChange;
       loser.elo = Math.max(1, loser.elo - eloChange); // Prevent negative ELO
 
@@ -285,7 +284,15 @@ export class MatchService implements IMatchService {
 
       // Save match
       const updatedMatch = await this.matchRepository.save(match);
-      return updatedMatch;
+
+      // Attach ELO change info for Discord embed (not persisted in DB)
+      return {
+        ...updatedMatch,
+        player1EloChange: player1.id === winner.id ? +eloChange : -eloChange,
+        player2EloChange: player2.id === winner.id ? +eloChange : -eloChange,
+        player1EloBefore,
+        player2EloBefore
+      };
     } catch (error) {
       console.error('Error reporting match result:', error);
       throw error;
