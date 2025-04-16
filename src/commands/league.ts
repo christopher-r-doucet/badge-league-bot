@@ -520,7 +520,7 @@ const deleteLeagueCommand = {
   
   async execute(interaction: ChatInputCommandInteraction) {
     try {
-      await interaction.deferReply();
+      // Don't defer reply here since it's already deferred in index.ts
       
       const leagueName = interaction.options.getString('league', true);
       const confirm = interaction.options.getBoolean('confirm', true);
@@ -554,7 +554,11 @@ const deleteLeagueCommand = {
       return interaction.editReply(`The "${leagueName}" league has been successfully deleted.`);
     } catch (error: any) {
       console.error('Error executing delete_league command:', error);
-      return interaction.editReply(`Error deleting league: ${error.message}`);
+      
+      // Check if we can still reply
+      if (!interaction.replied) {
+        return interaction.editReply(`Error deleting league: ${error.message}`);
+      }
     }
   }
 } as Command;

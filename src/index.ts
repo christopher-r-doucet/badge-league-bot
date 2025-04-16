@@ -60,36 +60,37 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
 
 // Handle slash commands
 async function handleSlashCommand(interaction: ChatInputCommandInteraction) {
+  // Get the command from our command collection
   const command = commands.get(interaction.commandName);
+  
+  // Log command execution
+  console.log(`Executing command: ${interaction.commandName} ${command?.deploymentType === 'global' ? '(GLOBAL)' : '(guild command)'} for user: ${interaction.user.username}`);
+  
+  // Defer reply to give us time to process
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply();
+    }
+  } catch (error) {
+    console.error('Error deferring reply:', error);
+  }
   
   if (!command) {
     console.error(`No command matching ${interaction.commandName} was found.`);
-    return interaction.reply({ 
-      content: `No command matching ${interaction.commandName} was found.`, 
-      ephemeral: true 
-    });
+    return;
   }
   
-  // Defer reply to give us time to process
-  await interaction.deferReply();
-  
   try {
-    // Log command usage with deployment type info
-    const deploymentType = command.deploymentType || 'unknown';
-    console.log(`Executing command: ${interaction.commandName} (${deploymentType} command) for user: ${interaction.user.tag}`);
-    
-    // Execute the command
     await command.execute(interaction);
   } catch (error) {
-    console.error(`Error executing ${interaction.commandName}:`, error);
+    console.error(`Error executing ${interaction.commandName} command:`, error);
     
-    if (interaction.replied || interaction.deferred) {
-      await interaction.editReply({ content: 'There was an error while executing this command!' });
-    } else {
-      await interaction.reply({ 
-        content: 'There was an error while executing this command!', 
-        ephemeral: true 
-      });
+    try {
+      if (!interaction.replied) {
+        await interaction.editReply({ content: 'There was an error while executing this command!' });
+      }
+    } catch (replyError) {
+      console.error('Error sending error reply:', replyError);
     }
   }
 }
