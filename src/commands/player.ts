@@ -1,6 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder, EmbedBuilder, AttachmentBuilder, AutocompleteInteraction, StringSelectMenuBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, StringSelectMenuInteraction, ButtonInteraction } from 'discord.js';
 import type { Command } from '../types/commands.js';
-import { db } from '../database/index-new-complete.js';
+import { db } from '../database/index.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 

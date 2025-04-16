@@ -11,6 +11,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Define entities array for consistent usage
+const entities = [League, Player, Match, UserPreference];
+
 /**
  * Manages database connection and initialization
  */
@@ -23,8 +26,18 @@ export class DatabaseConnection {
    */
   static async getConnection(): Promise<DataSource> {
     if (!this.instance || !this.instance.isInitialized) {
-      this.instance = await this.createConnection();
-      await this.initializeDatabase();
+      console.log('Creating new database connection...');
+      this.instance = this.createConnection();
+      
+      try {
+        console.log('Initializing database connection...');
+        await this.instance.initialize();
+        console.log('Database connection initialized successfully');
+        await this.initializeDatabase();
+      } catch (error) {
+        console.error('Error initializing database connection:', error);
+        throw error;
+      }
     }
     return this.instance;
   }
@@ -35,6 +48,9 @@ export class DatabaseConnection {
   private static createConnection(): DataSource {
     // Determine database path based on environment
     let dbPath = 'league.db';
+    
+    // Log entity information for debugging
+    console.log(`Registering entities: ${entities.map(e => e.name).join(', ')}`);
     
     // In production (Heroku), use DATABASE_URL if available
     if (process.env.NODE_ENV === 'production') {
@@ -52,7 +68,7 @@ export class DatabaseConnection {
             rejectUnauthorized: false
           },
           synchronize: true,
-          entities: [League, Player, Match, UserPreference],
+          entities: entities,
           logging: ['error', 'warn', 'schema']
         });
       } else {
@@ -79,7 +95,7 @@ export class DatabaseConnection {
       type: 'sqlite',
       database: dbPath,
       synchronize: true,
-      entities: [League, Player, Match, UserPreference],
+      entities: entities,
       logging: ['error', 'warn', 'schema']
     });
   }
@@ -89,22 +105,26 @@ export class DatabaseConnection {
    */
   private static async initializeDatabase(): Promise<void> {
     try {
-      await this.instance.initialize();
-      console.log('Database initialized successfully');
+      // Log entity metadata for debugging
+      console.log(`Available entity metadata: ${this.instance.entityMetadatas.map(meta => meta.name).join(', ')}`);
       
       // Log some diagnostic information
-      const leagueRepository = this.instance.getRepository(League);
-      const leagues = await leagueRepository.find();
-      console.log(`Found ${leagues.length} leagues in database`);
-      
-      // Create a test league if none exist and we're in development
-      if (leagues.length === 0 && process.env.NODE_ENV === 'development') {
-        console.log('Creating a test league...');
-        const testLeague = new League();
-        testLeague.name = 'Test League';
-        testLeague.createdAt = new Date();
-        await leagueRepository.save(testLeague);
-        console.log('Test league created');
+      try {
+        const leagueRepository = this.instance.getRepository(League);
+        const leagues = await leagueRepository.find();
+        console.log(`Found ${leagues.length} leagues in database`);
+        
+        // Create a test league if none exist and we're in development
+        if (leagues.length === 0 && process.env.NODE_ENV === 'development') {
+          console.log('Creating a test league...');
+          const testLeague = new League();
+          testLeague.name = 'Test League';
+          testLeague.createdAt = new Date();
+          await leagueRepository.save(testLeague);
+          console.log('Test league created');
+        }
+      } catch (error) {
+        console.error('Error accessing League repository:', error);
       }
     } catch (error) {
       console.error('Error initializing database:', error);

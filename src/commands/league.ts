@@ -1,6 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder, AutocompleteInteraction, EmbedBuilder, CommandInteraction, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
 import type { Command } from '../types/commands.js';
-import { db } from '../database/index-new-complete.js';
+import { db } from '../database/index.js';
 
 // Helper function for league name autocomplete
 async function handleLeagueAutocomplete(interaction: AutocompleteInteraction) {

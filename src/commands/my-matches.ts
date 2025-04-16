@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ChatInputCommandInteraction } from 'discord.js';
-import { db } from '../database/index-new-complete.js';
+import { db } from '../database/index.js';
 import { MatchStatus } from '../entities/Match.js';
 import { formatDate } from '../utils/formatters.js';
 import type { Command } from '../types/commands.js';
