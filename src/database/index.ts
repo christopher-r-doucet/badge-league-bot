@@ -37,9 +37,7 @@ class Database {
           },
           synchronize: true,
           entities: [League, Player, Match, UserPreference],
-          migrations: [`${__dirname}/../migrations/*.js`],
-          migrationsRun: true,
-          logging: ['error', 'warn', 'migration']
+          logging: ['error', 'warn', 'schema']
         });
         return;
       } else {
@@ -67,9 +65,7 @@ class Database {
       database: dbPath,
       synchronize: true,
       entities: [League, Player, Match, UserPreference],
-      migrations: [`${__dirname}/../migrations/*.js`],
-      migrationsRun: true,
-      logging: ['error', 'warn', 'migration']
+      logging: ['error', 'warn', 'schema']
     });
   }
 
