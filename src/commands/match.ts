@@ -58,8 +58,8 @@ async function handleMatchIdAutocomplete(interaction: AutocompleteInteraction) {
 // Schedule match command
 const scheduleMatchCommand: Command = {
   data: new SlashCommandBuilder()
-    .setName('schedule_match')
-    .setDescription('Schedule a Match with another player')
+    .setName('schedule_match_guild')
+    .setDescription('Schedule a Match with another player [Guild]')
     .addUserOption(option => 
       option.setName('opponent')
         .setDescription('The player you want to challenge')
@@ -245,8 +245,8 @@ const scheduleMatchCommand: Command = {
 // Report match result command
 const reportResultCommand: Command = {
   data: new SlashCommandBuilder()
-    .setName('report_result')
-    .setDescription('Report the Result of a completed match')
+    .setName('report_result_guild')
+    .setDescription('Report the Result of a completed match [Guild]')
     .addStringOption(option => 
       option.setName('match_id')
         .setDescription('ID of the match to report')
@@ -369,8 +369,8 @@ const reportResultCommand: Command = {
 // View scheduled matches command
 const viewMatchesCommand: Command = {
   data: new SlashCommandBuilder()
-    .setName('view_matches')
-    .setDescription('View All Matches in a league')
+    .setName('view_matches_guild')
+    .setDescription('View All Matches in a league [Guild]')
     .addStringOption(option => 
       option.setName('league')
         .setDescription('The league to view matches for')
@@ -457,8 +457,8 @@ const viewMatchesCommand: Command = {
 // Cancel match command
 const cancelMatchCommand: Command = {
   data: new SlashCommandBuilder()
-    .setName('cancel_match')
-    .setDescription('Cancel a Match you scheduled')
+    .setName('cancel_match_guild')
+    .setDescription('Cancel a Match you scheduled [Guild]')
     .addStringOption(option => 
       option.setName('match_id')
         .setDescription('ID of the match to cancel')

@@ -50,11 +50,11 @@ const helpCommand = {
       .setTitle('🏆 League Commands')
       .setDescription('Commands for managing leagues:')
       .addFields(
-        { name: '/create_league', value: 'Create a new league for you and your friends', inline: true },
-        { name: '/join_league', value: 'Join an existing league', inline: true },
+        { name: '/create_league_guild', value: 'Create a new league for you and your friends', inline: true },
+        { name: '/join_league_guild', value: 'Join an existing league', inline: true },
         { name: '/list_leagues', value: 'See all available leagues', inline: true },
-        { name: '/league_standings', value: 'View rankings in a specific league', inline: true },
-        { name: '/invite_to_league', value: 'Invite someone to join your league', inline: true },
+        { name: '/league_standings_guild', value: 'View rankings in a specific league', inline: true },
+        { name: '/invite_to_league_guild', value: 'Invite someone to join your league', inline: true },
         { name: '/status', value: 'Check your current rank and stats', inline: true }
       )
       .setTimestamp()
@@ -66,22 +66,23 @@ const helpCommand = {
       .setTitle('⚔️ Match Commands')
       .setDescription('Commands for scheduling and reporting matches:')
       .addFields(
-        { name: '/schedule_match', value: 'Schedule a match with another player', inline: true },
-        { name: '/my_matches', value: 'View your upcoming and completed matches', inline: true },
-        { name: '/view_matches', value: 'View all scheduled matches in a league', inline: true },
-        { name: '/cancel_match', value: 'Cancel a scheduled match', inline: true }
+        { name: '/schedule_match_guild', value: 'Schedule a match with another player', inline: true },
+        { name: '/my_matches_guild', value: 'View your upcoming and completed matches', inline: true },
+        { name: '/view_matches_guild', value: 'View all scheduled matches in a league', inline: true },
+        { name: '/cancel_match_guild', value: 'Cancel a scheduled match', inline: true },
+        { name: '/report_result_guild', value: 'Report the result of a completed match', inline: true }
       )
       .addFields({
         name: '📝 Reporting Match Results',
-        value: 'After completing a match, use the "Report Result" button on your match message. You\'ll be asked if you won or lost - simply type "win" or "loss" to report your result. The system will automatically update rankings and ELO ratings.'
+        value: 'After completing a match, use the "/report_result_guild" command or the "Report Result" button on your match message. You\'ll be asked if you won or lost - simply type "win" or "loss" to report your result. The system will automatically update rankings and ELO ratings.'
       })
       .addFields({
         name: '🚀 Getting Started',
-        value: '1. Create a league with `/create_league`\n' +
-               '2. Invite friends with `/invite_to_league`\n' +
-               '3. Schedule matches with `/schedule_match`\n' +
-               '4. Report results using the "Report Result" button\n' +
-               '5. Check standings with `/league_standings`'
+        value: '1. Create a league with `/create_league_guild`\n' +
+               '2. Invite friends with `/invite_to_league_guild`\n' +
+               '3. Schedule matches with `/schedule_match_guild`\n' +
+               '4. Report results using `/report_result_guild` or the "Report Result" button\n' +
+               '5. Check standings with `/league_standings_guild`'
       })
       .setTimestamp()
       .setFooter({ text: 'Badge League Bot' });

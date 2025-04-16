@@ -98,7 +98,7 @@ async function paginateMatches(interaction: ButtonInteraction | ChatInputCommand
 
 const myMatchesCommand = {
   data: new SlashCommandBuilder()
-    .setName('my_matches')
+    .setName('my_matches_guild')
     .setDescription('View My Matches (upcoming and completed) [Guild]')
     .addStringOption(option => 
       option.setName('league')

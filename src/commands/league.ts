@@ -48,8 +48,8 @@ async function safeReply(interaction: ChatInputCommandInteraction, content: stri
 
 const createLeagueCommand = {
   data: new SlashCommandBuilder()
-    .setName('create_league')
-    .setDescription('Create a New League')
+    .setName('create_league_guild')
+    .setDescription('Create a New League [Guild]')
     .addStringOption(option =>
       option.setName('name')
         .setDescription('The name of the league')
@@ -88,9 +88,9 @@ const createLeagueCommand = {
           { 
             name: 'Next Steps',
             value: [
-              '1. Invite your friends with `/invite_to_league`',
-              '2. Join the league yourself with `/join_league`',
-              '3. Check standings with `/league_standings`'
+              '1. Invite your friends with `/invite_to_league_guild`',
+              '2. Join the league yourself with `/join_league_guild`',
+              '3. Check standings with `/league_standings_guild`'
             ].join('\n')
           }
         )
@@ -111,8 +111,8 @@ const createLeagueCommand = {
 
 const joinLeagueCommand = {
   data: new SlashCommandBuilder()
-    .setName('join_league')
-    .setDescription('Join an Existing League')
+    .setName('join_league_guild')
+    .setDescription('Join an Existing League [Guild]')
     .addStringOption(option =>
       option.setName('league')
         .setDescription('The name of the league')
@@ -183,7 +183,7 @@ const listLeaguesCommand = {
       const leagues = await db.getGuildLeagues(guildId);
       
       if (leagues.length === 0) {
-        return interaction.editReply({ content: 'No leagues found in this server. Create one with `/create_league`!' });
+        return interaction.editReply({ content: 'No leagues found in this server. Create one with `/create_league_guild`!' });
       }
       
       // Create embed
@@ -217,7 +217,7 @@ const listLeaguesCommand = {
       // Add instructions
       embed.addFields({
         name: 'How to Join',
-        value: 'Use `/join_league` to join a league\nUse `/league_standings` to view rankings',
+        value: 'Use `/join_league_guild` to join a league\nUse `/league_standings_guild` to view rankings',
         inline: false
       });
       
@@ -235,8 +235,8 @@ const listLeaguesCommand = {
 
 const leagueStandingsCommand = {
   data: new SlashCommandBuilder()
-    .setName('league_standings')
-    .setDescription('Show the League Standings and Rankings')
+    .setName('league_standings_guild')
+    .setDescription('Show the League Standings and Rankings [Guild]')
     .addStringOption(option =>
       option.setName('league')
         .setDescription('The name of the league')
@@ -332,8 +332,8 @@ const leagueStandingsCommand = {
 
 const inviteToLeagueCommand = {
   data: new SlashCommandBuilder()
-    .setName('invite_to_league')
-    .setDescription('Invite a Player to Join Your League')
+    .setName('invite_to_league_guild')
+    .setDescription('Invite a Player to Join Your League [Guild]')
     .addStringOption(option =>
       option.setName('league')
         .setDescription('The name of the league')
@@ -420,8 +420,8 @@ const inviteToLeagueCommand = {
 
 const leaveLeagueCommand = {
   data: new SlashCommandBuilder()
-    .setName('leave_league')
-    .setDescription('Leave a league you are currently in')
+    .setName('leave_league_guild')
+    .setDescription('Leave a league you are currently in [Guild]')
     .addStringOption(option => 
       option.setName('league')
         .setDescription('The league you want to leave')
@@ -480,8 +480,8 @@ const leaveLeagueCommand = {
 
 const deleteLeagueCommand = {
   data: new SlashCommandBuilder()
-    .setName('delete_league')
-    .setDescription('Delete a league (creator only, admin can override restrictions)')
+    .setName('delete_league_guild')
+    .setDescription('Delete a league (creator only, admin can override restrictions) [Guild]')
     .addStringOption(option => 
       option.setName('league')
         .setDescription('The name of the league')
