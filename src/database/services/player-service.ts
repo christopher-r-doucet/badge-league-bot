@@ -46,6 +46,11 @@ export interface IPlayerService {
    * Get all leagues a player is in
    */
   getPlayerLeagues(discordId: string, guildId?: string): Promise<any[]>;
+  
+  /**
+   * Remove a player from a league
+   */
+  removePlayerFromLeague(discordId: string, leagueId: string): Promise<boolean>;
 }
 
 /**
@@ -270,6 +275,32 @@ export class PlayerService implements IPlayerService {
       return filteredLeagues;
     } catch (error) {
       console.error('Error getting player leagues:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Remove a player from a league
+   */
+  async removePlayerFromLeague(discordId: string, leagueId: string): Promise<boolean> {
+    try {
+      // Find the player in this league
+      const players = await this.playerRepository.findByDiscordIdAndLeagueId(discordId, leagueId);
+      
+      if (!players || players.length === 0) {
+        console.log(`Player ${discordId} not found in league ${leagueId}`);
+        return false;
+      }
+      
+      // Remove the player from the league
+      for (const player of players) {
+        await this.playerRepository.remove(player);
+      }
+      
+      console.log(`Player ${discordId} removed from league ${leagueId}`);
+      return true;
+    } catch (error) {
+      console.error('Error removing player from league:', error);
       throw error;
     }
   }

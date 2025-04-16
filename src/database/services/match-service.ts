@@ -4,7 +4,7 @@ import { Rank } from '../../entities/Player.js';
 import { IMatchRepository, MatchRepository } from '../repositories/match-repository.js';
 import { IPlayerRepository, PlayerRepository } from '../repositories/player-repository.js';
 import { ILeagueRepository, LeagueRepository } from '../repositories/league-repository.js';
-import { MoreThanOrEqual } from 'typeorm';
+import { MoreThanOrEqual, In } from 'typeorm';
 
 /**
  * Match service interface
@@ -44,6 +44,11 @@ export interface IMatchService {
    * Cancel a match
    */
   cancelMatch(matchId: string, discordId: string): Promise<Match>;
+  
+  /**
+   * Get all active matches for a player in a specific league
+   */
+  getPlayerActiveMatches(discordId: string, leagueId: string): Promise<Match[]>;
 }
 
 /**
@@ -327,6 +332,35 @@ export class MatchService implements IMatchService {
       return updatedMatch;
     } catch (error) {
       console.error('Error cancelling match:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get all active matches for a player in a specific league
+   */
+  async getPlayerActiveMatches(discordId: string, leagueId: string): Promise<Match[]> {
+    try {
+      // Find the player in this league
+      const players = await this.playerRepository.findByDiscordIdAndLeagueId(discordId, leagueId);
+      
+      if (!players || players.length === 0) {
+        return [];
+      }
+      
+      const playerIds = players.map(player => player.id);
+      
+      // Find all active matches where the player is a participant
+      const matches = await this.matchRepository.find({
+        where: [
+          { player1Id: In(playerIds), leagueId, status: MatchStatus.SCHEDULED },
+          { player2Id: In(playerIds), leagueId, status: MatchStatus.SCHEDULED }
+        ]
+      });
+      
+      return matches;
+    } catch (error) {
+      console.error('Error getting player active matches:', error);
       throw error;
     }
   }

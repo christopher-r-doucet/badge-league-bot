@@ -218,9 +218,9 @@ export class Database {
    * Create a new league
    * This is a proxy method for backward compatibility
    */
-  static async createLeague(name: string, guildId: string): Promise<any> {
+  static async createLeague(name: string, guildId: string, creatorId: string): Promise<any> {
     const leagueService = await this.getLeagueService();
-    return leagueService.createLeague(name, guildId);
+    return leagueService.createLeague({ name, guildId, creatorId });
   }
   
   /**

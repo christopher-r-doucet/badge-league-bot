@@ -19,6 +19,11 @@ export interface IPlayerRepository extends IBaseRepository<Player> {
   findByDiscordIdAndLeagueId(discordId: string, leagueId: string): Promise<Player[]>;
   
   /**
+   * Find players by league ID
+   */
+  findByLeagueId(leagueId: string): Promise<Player[]>;
+  
+  /**
    * Find players by league name
    */
   findByLeagueName(leagueName: string): Promise<Player[]>;
@@ -71,6 +76,15 @@ export class PlayerRepository extends BaseRepository<Player> implements IPlayerR
         discordId,
         leagueId
       }
+    });
+  }
+  
+  /**
+   * Find players by league ID
+   */
+  async findByLeagueId(leagueId: string): Promise<Player[]> {
+    return this.repository.find({
+      where: { leagueId }
     });
   }
   

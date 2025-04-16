@@ -10,6 +10,21 @@ export interface IBaseRepository<T extends ObjectLiteral> {
   findById(id: string): Promise<T | null>;
   
   /**
+   * Find all entities
+   */
+  findAll(): Promise<T[]>;
+  
+  /**
+   * Save an entity
+   */
+  save(entity: T): Promise<T>;
+  
+  /**
+   * Remove an entity
+   */
+  remove(entity: T): Promise<T>;
+  
+  /**
    * Find entities by criteria
    */
   findBy(criteria: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<T[]>;
@@ -20,11 +35,6 @@ export interface IBaseRepository<T extends ObjectLiteral> {
   findOneBy(criteria: FindOptionsWhere<T>): Promise<T | null>;
   
   /**
-   * Save an entity
-   */
-  save(entity: T): Promise<T>;
-  
-  /**
    * Save multiple entities
    */
   saveMany(entities: T[]): Promise<T[]>;
@@ -33,11 +43,6 @@ export interface IBaseRepository<T extends ObjectLiteral> {
    * Delete an entity
    */
   delete(id: string): Promise<void>;
-  
-  /**
-   * Find all entities
-   */
-  findAll(): Promise<T[]>;
   
   /**
    * Get the TypeORM repository
@@ -59,6 +64,27 @@ export class BaseRepository<T extends ObjectLiteral> implements IBaseRepository<
   }
   
   /**
+   * Find all entities
+   */
+  async findAll(): Promise<T[]> {
+    return this.repository.find();
+  }
+  
+  /**
+   * Save an entity
+   */
+  async save(entity: T): Promise<T> {
+    return this.repository.save(entity);
+  }
+  
+  /**
+   * Remove an entity
+   */
+  async remove(entity: T): Promise<T> {
+    return this.repository.remove(entity);
+  }
+  
+  /**
    * Find entities by criteria
    */
   async findBy(criteria: FindOptionsWhere<T> | FindOptionsWhere<T>[]): Promise<T[]> {
@@ -73,13 +99,6 @@ export class BaseRepository<T extends ObjectLiteral> implements IBaseRepository<
   }
   
   /**
-   * Save an entity
-   */
-  async save(entity: T): Promise<T> {
-    return this.repository.save(entity);
-  }
-  
-  /**
    * Save multiple entities
    */
   async saveMany(entities: T[]): Promise<T[]> {
@@ -91,13 +110,6 @@ export class BaseRepository<T extends ObjectLiteral> implements IBaseRepository<
    */
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
-  }
-  
-  /**
-   * Find all entities
-   */
-  async findAll(): Promise<T[]> {
-    return this.repository.find();
   }
   
   /**

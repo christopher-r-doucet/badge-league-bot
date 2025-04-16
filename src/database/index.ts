@@ -178,6 +178,15 @@ export class Database {
     return matchService.cancelMatch(matchId, discordId);
   }
   
+  /**
+   * Get all active matches for a player in a specific league
+   */
+  static async getPlayerActiveMatches(discordId: string, leagueId: string): Promise<any[]> {
+    await this.ensureInitialized();
+    const matchService = await this.getMatchService();
+    return matchService.getPlayerActiveMatches(discordId, leagueId);
+  }
+  
   // PLAYER SERVICE METHODS
   
   /**
@@ -252,6 +261,15 @@ export class Database {
     return playerService.getPlayerLeagues(discordId, guildId);
   }
   
+  /**
+   * Remove a player from a league
+   */
+  static async removePlayerFromLeague(discordId: string, leagueId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const playerService = await this.getPlayerService();
+    return playerService.removePlayerFromLeague(discordId, leagueId);
+  }
+  
   // LEAGUE SERVICE METHODS
   
   /**
@@ -301,10 +319,10 @@ export class Database {
   /**
    * Create a new league
    */
-  static async createLeague(name: string, guildId: string): Promise<any> {
+  static async createLeague(leagueData: { name: string, guildId: string, creatorId: string }): Promise<any> {
     await this.ensureInitialized();
     const leagueService = await this.getLeagueService();
-    return leagueService.createLeague(name, guildId);
+    return leagueService.createLeague(leagueData);
   }
   
   /**
@@ -314,6 +332,24 @@ export class Database {
     await this.ensureInitialized();
     const leagueService = await this.getLeagueService();
     return leagueService.getLeagueLeaderboard(leagueName);
+  }
+  
+  /**
+   * Delete a league (only if creator or admin, and no active matches)
+   */
+  static async deleteLeague(leagueId: string, discordId: string, guildId?: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const leagueService = await this.getLeagueService();
+    return leagueService.deleteLeague(leagueId, discordId, guildId);
+  }
+  
+  /**
+   * Check if a user is the creator of a league
+   */
+  static async isLeagueCreator(leagueId: string, discordId: string): Promise<boolean> {
+    await this.ensureInitialized();
+    const leagueService = await this.getLeagueService();
+    return leagueService.isLeagueCreator(leagueId, discordId);
   }
   
   // USER PREFERENCE METHODS

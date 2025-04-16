@@ -6,11 +6,14 @@ export class League implements ILeague {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column()
+  @Column({ unique: true })
   name!: string;
 
   @Column({ nullable: true })
   guildId!: string;
+
+  @Column({ nullable: true })
+  creatorId!: string;
 
   @CreateDateColumn()
   createdAt!: Date;
