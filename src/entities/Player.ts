@@ -30,6 +30,9 @@ export class Player {
 
   @Column({ nullable: true })
   leagueId: string;
+  
+  // Transient property - not stored in database
+  leagueName?: string;
 
   get winRate(): number {
     const totalGames = this.wins + this.losses;

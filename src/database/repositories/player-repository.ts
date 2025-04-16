@@ -145,6 +145,9 @@ export class PlayerRepository extends BaseRepository<Player> implements IPlayerR
           return null;
         }
         
+        // Add the league name to the player object
+        player.leagueName = league.name;
+        
         console.log(`Found stats for player ${discordId} in league "${leagueName}":`, player);
         return player;
       }
@@ -158,6 +161,16 @@ export class PlayerRepository extends BaseRepository<Player> implements IPlayerR
       if (!player) {
         console.log(`No stats found for player ${discordId}`);
         return null;
+      }
+
+      // Get the league name for this player
+      if (player.leagueId) {
+        const league = await this.leagueRepository.findOne({
+          where: { id: player.leagueId }
+        });
+        if (league) {
+          player.leagueName = league.name;
+        }
       }
 
       console.log(`Found stats for player ${discordId}:`, player);
