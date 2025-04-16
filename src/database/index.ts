@@ -630,18 +630,27 @@ class Database {
       const matchRepository = this.dataSource.getRepository(Match);
       const leagueRepository = this.dataSource.getRepository(League);
 
-      // Find the player
-      const player = await playerRepository.findOne({
+      console.log(`Getting matches for player with Discord ID: ${discordId}, status filter: ${status || 'none'}, guild filter: ${guildId || 'none'}`);
+
+      // Find all player records for this Discord ID
+      const players = await playerRepository.find({
         where: { discordId }
       });
 
-      if (!player) {
-        throw new Error('Player not found');
+      console.log(`Found ${players.length} player records for Discord ID: ${discordId}`);
+      
+      if (players.length === 0) {
+        console.log(`No player records found for Discord ID: ${discordId}`);
+        return [];
       }
+
+      // Get player IDs
+      const playerIds = players.map(player => player.id);
+      console.log(`Player IDs: ${playerIds.join(', ')}`);
 
       // Build query for matches where the player is either player1 or player2
       let query = matchRepository.createQueryBuilder('match')
-        .where('match.player1Id = :playerId OR match.player2Id = :playerId', { playerId: player.id });
+        .where('(match.player1Id IN (:...playerIds) OR match.player2Id IN (:...playerIds))', { playerIds });
       
       // Add status filter if provided
       if (status) {
@@ -653,6 +662,7 @@ class Database {
       
       // Execute the query
       const matches = await query.getMany();
+      console.log(`Found ${matches.length} matches for player(s) with Discord ID: ${discordId}`);
 
       // Enrich matches with player and league data
       const enrichedMatches = await Promise.all(matches.map(async (match) => {
@@ -674,7 +684,10 @@ class Database {
       }));
 
       // Filter out null values (matches from other guilds)
-      return enrichedMatches.filter(match => match !== null);
+      const filteredMatches = enrichedMatches.filter(match => match !== null);
+      console.log(`Returning ${filteredMatches.length} matches after filtering`);
+      
+      return filteredMatches;
     } catch (error) {
       console.error('Error getting player matches:', error);
       throw error;
