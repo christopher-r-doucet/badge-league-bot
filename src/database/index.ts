@@ -808,15 +808,18 @@ class Database {
       }
 
       // Validate reporter
-      const reporter = await playerRepository.findOne({
-        where: { discordId: reporterId }
+      const reporters = await playerRepository.find({
+        where: {
+          discordId: reporterId,
+          leagueId: match.leagueId
+        }
       });
 
-      if (!reporter) {
-        throw new Error('Reporter not found');
+      if (!reporters || reporters.length === 0) {
+        throw new Error('Reporter not found in this league');
       }
 
-      const isParticipant = match.player1Id === reporter.id || match.player2Id === reporter.id;
+      const isParticipant = reporters.some(player => match.player1Id === player.id || match.player2Id === player.id);
       if (!isParticipant) {
         throw new Error('Only match participants can report results');
       }
