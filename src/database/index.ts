@@ -895,23 +895,35 @@ class Database {
         throw new Error('This match is not in scheduled status');
       }
 
-      // Find the player
-      const player = await playerRepository.findOne({
-        where: { discordId }
+      console.log(`Cancelling match ${matchId} by user ${discordId} in league ${match.leagueId}`);
+
+      // Find the player in the specific league for this match
+      const players = await playerRepository.find({
+        where: { 
+          discordId,
+          leagueId: match.leagueId
+        }
       });
 
-      if (!player) {
-        throw new Error('Player not found');
+      if (players.length === 0) {
+        console.log(`Player with Discord ID ${discordId} not found in league ${match.leagueId}`);
+        throw new Error('Player not found in this league');
       }
+
+      const player = players[0]; // Take the first player found in this league
+      console.log(`Found player ${player.id} for Discord ID ${discordId} in league ${match.leagueId}`);
 
       // Validate player is participant
       const isParticipant = match.player1Id === player.id || match.player2Id === player.id;
       if (!isParticipant) {
+        console.log(`Player ${player.id} is not a participant in match ${matchId}`);
+        console.log(`Match player1Id: ${match.player1Id}, player2Id: ${match.player2Id}`);
         throw new Error('Only match participants can cancel the match');
       }
 
       // Cancel match
       match.status = MatchStatus.CANCELLED;
+      console.log(`Match ${matchId} cancelled by player ${player.id}`);
 
       // Save the match
       const updatedMatch = await matchRepository.save(match);

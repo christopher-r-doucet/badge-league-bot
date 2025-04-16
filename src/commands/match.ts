@@ -466,19 +466,20 @@ const myMatchesCommand: Command = {
         // Add each scheduled match
         scheduledMatches.forEach((match, index) => {
           // Determine opponent
-          const isPlayer1 = match.player1Id === interaction.user.id;
-          const opponentId = isPlayer1 ? match.player2Id : match.player1Id;
-          
+          const isPlayer1 = match.player1.discordId === interaction.user.id;
+          const opponent = isPlayer1 ? match.player2 : match.player1;
+          const opponentName = opponent ? opponent.username : 'Unknown player';
+
           // Format date
           const dateInfo = match.scheduledDate 
             ? formatDate(match.scheduledDate) 
             : 'Instant match (no scheduled date)';
-          
+
           // Confirmation status
           const player1Confirmed = match.player1Confirmed ? '✅' : '❌';
           const player2Confirmed = match.player2Confirmed ? '✅' : '❌';
           const confirmationStatus = `You: ${isPlayer1 ? player1Confirmed : player2Confirmed} | Opponent: ${isPlayer1 ? player2Confirmed : player1Confirmed}`;
-          
+
           // Get match status with confirmation details
           let matchStatusDisplay = match.status;
           if (match.status === MatchStatus.SCHEDULED) {
@@ -488,13 +489,13 @@ const myMatchesCommand: Command = {
               matchStatusDisplay = 'Waiting for acceptance';
             }
           }
-          
+
           // Get league name
           const leagueInfo = `League ID: ${match.leagueId}`;
-          
+
           embed.addFields({
             name: `Match #${index + 1}`,
-            value: `**Opponent**: <@${opponentId}>\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+            value: `**Opponent**: ${opponentName}\n**Status**: ${matchStatusDisplay}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
             inline: false
           });
         });
@@ -514,21 +515,22 @@ const myMatchesCommand: Command = {
           .slice(0, 5)
           .forEach((match, index) => {
             // Determine opponent and result
-            const isPlayer1 = match.player1Id === interaction.user.id;
-            const opponentId = isPlayer1 ? match.player2Id : match.player1Id;
+            const isPlayer1 = match.player1.discordId === interaction.user.id;
+            const opponent = isPlayer1 ? match.player2 : match.player1;
+            const opponentName = opponent ? opponent.username : 'Unknown player';
             const didWin = (isPlayer1 && match.winnerId === match.player1Id) || (!isPlayer1 && match.winnerId === match.player2Id);
-            
+
             // Format completion date
             const dateInfo = match.completedDate 
               ? formatDate(match.completedDate) 
               : 'Unknown date';
-            
+
             // Get league name
             const leagueInfo = `League ID: ${match.leagueId}`;
-            
+
             embed.addFields({
               name: `Match #${index + 1}`,
-              value: `**Opponent**: <@${opponentId}>\n**Result**: ${didWin ? '🏆 Win' : '❌ Loss'}\n**Date**: ${dateInfo}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
+              value: `**Opponent**: ${opponentName}\n**Result**: ${didWin ? '🏆 Win' : '❌ Loss'}\n**Date**: ${dateInfo}\n**${leagueInfo}**\n**ID**: \`${match.id.substring(0, 8)}...\``,
               inline: false
             });
           });
