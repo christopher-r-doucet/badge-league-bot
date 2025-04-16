@@ -253,8 +253,14 @@ async function handleModalSubmit(interaction: Interaction) {
       const winner = player1Score > player2Score ? enrichedMatch.player1 : enrichedMatch.player2;
       const loser = player1Score > player2Score ? enrichedMatch.player2 : enrichedMatch.player1;
       
-      // Calculate ELO change - default to a fixed amount for simplicity
-      const eloChange = 25; // Standard ELO change for win/loss
+      // Calculate ELO change based on the difference between winner and loser ELO
+      // Using the standard ELO formula K-factor of 32
+      const expectedScore = 1 / (1 + Math.pow(10, (winner.elo - loser.elo) / 400));
+      const eloChange = Math.round(32 * (1 - expectedScore));
+      
+      // Format ELO changes with colors and emojis
+      const winnerEloText = `${winner.elo} (\`\`\`diff\n+${eloChange}\n\`\`\`) 📈`;
+      const loserEloText = `${loser.elo} (\`\`\`diff\n-${eloChange}\n\`\`\`) 📉`;
       
       // Create embed
       const embed = new EmbedBuilder()
@@ -262,9 +268,9 @@ async function handleModalSubmit(interaction: Interaction) {
         .setTitle('Match Result Reported')
         .setDescription(`Match in ${enrichedMatch.league.name} has been completed!`)
         .addFields(
-          { name: 'Winner', value: `<@${winner.discordId}>`, inline: true },
-          { name: 'Loser', value: `<@${loser.discordId}>`, inline: true },
-          { name: 'New ELO', value: `${winner.username}: ${winner.elo} (+${eloChange})\n${loser.username}: ${loser.elo} (-${eloChange})`, inline: false }
+          { name: 'Winner 🏆', value: `<@${winner.discordId}>`, inline: true },
+          { name: 'Loser 😔', value: `<@${loser.discordId}>`, inline: true },
+          { name: 'New ELO 📊', value: `${winner.username}: ${winnerEloText}\n${loser.username}: ${loserEloText}`, inline: false }
         );
       
       await interaction.editReply({ embeds: [embed] });
