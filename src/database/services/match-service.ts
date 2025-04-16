@@ -231,6 +231,11 @@ export class MatchService implements IMatchService {
         throw new Error('Only match participants can report results');
       }
 
+      // Check if both players have confirmed the match
+      if (!match.player1Confirmed || !match.player2Confirmed) {
+        throw new Error('Both players must confirm the match before results can be reported');
+      }
+
       // Validate scores
       if (player1Score < 0 || player2Score < 0) {
         throw new Error('Scores cannot be negative');
