@@ -293,6 +293,12 @@ const reportResultCommand: Command = {
         
         const isPlayer1 = matchBefore.player1Id === interaction.user.id;
         
+        console.log('Player identification debug:');
+        console.log(`matchBefore.player1Id: ${matchBefore.player1Id}`);
+        console.log(`matchBefore.player2Id: ${matchBefore.player2Id}`);
+        console.log(`interaction.user.id: ${interaction.user.id}`);
+        console.log(`isPlayer1: ${isPlayer1}`);
+        
         if ((isPlayer1 && didWin) || (!isPlayer1 && !didWin)) {
           // If user is player1 and won, or user is player2 and reported that they lost (meaning player1 won)
           player1Score = 1;
