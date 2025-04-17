@@ -268,8 +268,9 @@ async function handleModalSubmit(interaction: Interaction) {
         player1Score = isWin ? 1 : 0;
         player2Score = isWin ? 0 : 1;
       } else {
-        player1Score = isWin ? 0 : 1;
-        player2Score = isWin ? 1 : 0;
+        // If player 2 is reporting
+        player1Score = isWin ? 0 : 1;  // If player 2 wins, player 1 loses (score 0)
+        player2Score = isWin ? 1 : 0;  // If player 2 wins, player 2 wins (score 1)
       }
       
       // Report the result
