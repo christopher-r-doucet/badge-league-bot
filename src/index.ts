@@ -273,6 +273,11 @@ async function handleModalSubmit(interaction: Interaction) {
         player2Score = isWin ? 1 : 0;  // If player 2 wins, player 2 wins (score 1)
       }
       
+      console.log('Modal submission debug:');
+      console.log(`User: ${interaction.user.username}, ID: ${interaction.user.id}`);
+      console.log(`isPlayer1: ${isPlayer1}, isWin: ${isWin}`);
+      console.log(`player1Score: ${player1Score}, player2Score: ${player2Score}`);
+      
       // Report the result
       const updatedMatch = await db.reportMatchResult(
         id,

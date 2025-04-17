@@ -275,6 +275,12 @@ export class MatchService implements IMatchService {
       const loser = player1Wins ? player2 : player1;
       match.winnerId = winner.id;
       match.loserId = loser.id;
+      
+      console.log('Match result debug:');
+      console.log(`Player1: ${player1.username}, Score: ${player1Score}`);
+      console.log(`Player2: ${player2.username}, Score: ${player2Score}`);
+      console.log(`Winner: ${winner.username}, ID: ${winner.id}`);
+      console.log(`Loser: ${loser.username}, ID: ${loser.id}`);
 
       // Calculate ELO changes
       const eloChange = this.calculateEloChange(winner.elo, loser.elo);

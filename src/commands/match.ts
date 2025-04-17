@@ -294,14 +294,19 @@ const reportResultCommand: Command = {
         const isPlayer1 = matchBefore.player1Id === interaction.user.id;
         
         if ((isPlayer1 && didWin) || (!isPlayer1 && !didWin)) {
-          // If user is player1 and won, or user is player2 and lost
+          // If user is player1 and won, or user is player2 and reported that they lost (meaning player1 won)
           player1Score = 1;
           player2Score = 0;
         } else {
-          // If user is player1 and lost, or user is player2 and won
+          // If user is player1 and lost, or user is player2 and reported that they won (meaning player1 lost)
           player1Score = 0;
           player2Score = 1;
         }
+        
+        console.log('Match command debug:');
+        console.log(`User: ${interaction.user.username}, ID: ${interaction.user.id}`);
+        console.log(`isPlayer1: ${isPlayer1}, didWin: ${didWin}`);
+        console.log(`player1Score: ${player1Score}, player2Score: ${player2Score}`);
         
         // Report the match result
         const match = await db.reportMatchResult(matchId, interaction.user.id, player1Score, player2Score);
