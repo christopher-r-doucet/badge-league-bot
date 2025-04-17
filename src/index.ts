@@ -283,28 +283,63 @@ async function handleModalSubmit(interaction: Interaction) {
       
       // Get enriched match with player details
       const enrichedMatch = await db.getMatch(id);
-      const winner = player1Score > player2Score ? enrichedMatch.player1 : enrichedMatch.player2;
-      const loser = player1Score > player2Score ? enrichedMatch.player2 : enrichedMatch.player1;
       
-      // Calculate ELO change based on the difference between winner and loser ELO
-      // Using the standard ELO formula K-factor of 32
-      const expectedScore = 1 / (1 + Math.pow(10, (winner.elo - loser.elo) / 400));
-      const eloChange = Math.round(32 * (1 - expectedScore));
+      // Use the winnerId from the updated match to determine winner and loser
+      const winnerId = updatedMatch.winnerId;
+      const loserId = updatedMatch.loserId;
       
-      // Format ELO changes with colors and emojis
-      const winnerEloText = `${winner.elo} (\`\`\`diff\n+${eloChange}\n\`\`\`) 📈`;
-      const loserEloText = `${loser.elo} (\`\`\`diff\n-${eloChange}\n\`\`\`) 📉`;
+      const winner = enrichedMatch.player1.id === winnerId ? enrichedMatch.player1 : enrichedMatch.player2;
+      const loser = enrichedMatch.player1.id === loserId ? enrichedMatch.player1 : enrichedMatch.player2;
+      
+      // Format ELO changes with the chart emojis
+      const player1EloChange = updatedMatch.player1EloChange;
+      const player2EloChange = updatedMatch.player2EloChange;
+      
+      const player1Name = enrichedMatch.player1.username;
+      const player2Name = enrichedMatch.player2.username;
+      
+      const player1EloNew = updatedMatch.player1EloBefore + player1EloChange;
+      const player2EloNew = updatedMatch.player2EloBefore + player2EloChange;
+      
+      const player1IsWinner = enrichedMatch.player1.id === winnerId;
+      const player1ChangeText = player1IsWinner
+        ? `📈 ${player1Name}: ${player1EloNew}(+${Math.abs(player1EloChange)})` 
+        : `📉 ${player1Name}: ${player1EloNew}(${player1EloChange})`;
+        
+      const player2IsWinner = enrichedMatch.player2.id === winnerId;
+      const player2ChangeText = player2IsWinner
+        ? `📈 ${player2Name}: ${player2EloNew}(+${Math.abs(player2EloChange)})` 
+        : `📉 ${player2Name}: ${player2EloNew}(${player2EloChange})`;
       
       // Create embed
       const embed = new EmbedBuilder()
         .setColor('#00ff00')
         .setTitle('Match Result Reported')
-        .setDescription(`Match in ${enrichedMatch.league.name} has been completed!`)
+        .setDescription(`The result for match in ${enrichedMatch.league.name} has been reported.`)
         .addFields(
-          { name: 'Winner 🏆', value: `<@${winner.discordId}>`, inline: true },
-          { name: 'Loser 😔', value: `<@${loser.discordId}>`, inline: true },
-          { name: 'New ELO 📊', value: `${winner.username}: ${winnerEloText}\n${loser.username}: ${loserEloText}`, inline: false }
+          { 
+            name: 'Players', 
+            value: `${player1Name} vs ${player2Name}`, 
+            inline: false 
+          },
+          { 
+            name: 'Winner', 
+            value: winner.username, 
+            inline: true 
+          },
+          { 
+            name: 'Reported By', 
+            value: interaction.user.username, 
+            inline: true 
+          }
         );
+      
+      // Add ELO changes
+      embed.addFields({
+        name: 'New ELO',
+        value: `${player1ChangeText}\n${player2ChangeText}`,
+        inline: false
+      });
       
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {

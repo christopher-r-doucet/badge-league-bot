@@ -341,12 +341,14 @@ const reportResultCommand: Command = {
           const player2EloNew = match.player2EloBefore + match.player2EloChange;
           
           // Format ELO changes with correct signs and emojis
-          const player1ChangeText = match.player1EloChange > 0
-            ? `📈 ${player1Name}: ${player1EloNew}(+${match.player1EloChange})` 
+          const player1IsWinner = match.winnerId === matchBefore.player1Id;
+          const player1ChangeText = player1IsWinner
+            ? `📈 ${player1Name}: ${player1EloNew}(+${Math.abs(match.player1EloChange)})` 
             : `📉 ${player1Name}: ${player1EloNew}(${match.player1EloChange})`;
             
-          const player2ChangeText = match.player2EloChange > 0
-            ? `📈 ${player2Name}: ${player2EloNew}(+${match.player2EloChange})` 
+          const player2IsWinner = match.winnerId === matchBefore.player2Id;
+          const player2ChangeText = player2IsWinner
+            ? `📈 ${player2Name}: ${player2EloNew}(+${Math.abs(match.player2EloChange)})` 
             : `📉 ${player2Name}: ${player2EloNew}(${match.player2EloChange})`;
           
           embed.addFields({
