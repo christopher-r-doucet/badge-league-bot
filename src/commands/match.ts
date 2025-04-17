@@ -281,23 +281,24 @@ const reportResultCommand: Command = {
           return interaction.editReply('Match not found.');
         }
         
+        // Determine if the user is player1 or player2 based on Discord ID
+        const isPlayer1 = matchBefore.player1?.discordId === interaction.user.id;
+        
+        console.log('Player identification debug (fixed):');
+        console.log(`matchBefore.player1?.discordId: ${matchBefore.player1?.discordId}`);
+        console.log(`matchBefore.player2?.discordId: ${matchBefore.player2?.discordId}`);
+        console.log(`interaction.user.id: ${interaction.user.id}`);
+        console.log(`isPlayer1: ${isPlayer1}`);
+        
         // Get opponent details
-        const opponentId = matchBefore.player1Id === interaction.user.id ? matchBefore.player2Id : matchBefore.player1Id;
-        const opponentName = matchBefore.player1Id === interaction.user.id 
+        const opponentId = isPlayer1 ? matchBefore.player2Id : matchBefore.player1Id;
+        const opponentName = isPlayer1 
           ? (matchBefore.player2?.username || 'Unknown player')
           : (matchBefore.player1?.username || 'Unknown player');
         
         // Determine scores (1 for winner, 0 for loser)
         let player1Score = 0;
         let player2Score = 0;
-        
-        const isPlayer1 = matchBefore.player1Id === interaction.user.id;
-        
-        console.log('Player identification debug:');
-        console.log(`matchBefore.player1Id: ${matchBefore.player1Id}`);
-        console.log(`matchBefore.player2Id: ${matchBefore.player2Id}`);
-        console.log(`interaction.user.id: ${interaction.user.id}`);
-        console.log(`isPlayer1: ${isPlayer1}`);
         
         if ((isPlayer1 && didWin) || (!isPlayer1 && !didWin)) {
           // If user is player1 and won, or user is player2 and reported that they lost (meaning player1 won)
