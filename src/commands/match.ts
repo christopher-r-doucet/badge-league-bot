@@ -10,14 +10,37 @@ async function handleLeagueAutocomplete(interaction: AutocompleteInteraction) {
   const focusedValue = interaction.options.getFocused().toLowerCase();
   const guildId = interaction.guildId || undefined;
   
-  // Only show leagues for the current guild
-  const leagues = await db.getGuildLeagues(guildId);
-  
-  const filtered = leagues
-    .filter((league) => league.name.toLowerCase().includes(focusedValue))
-    .slice(0, 25) // Discord has a limit of 25 choices
-    .map((league) => ({ name: league.name, value: league.name }));
-  await interaction.respond(filtered);
+  try {
+    // Only show leagues for the current guild
+    const leagues = await db.getGuildLeagues(guildId);
+    
+    if (!leagues || leagues.length === 0) {
+      console.log(`No leagues found for guild ${guildId || 'unknown'}`);
+      await interaction.respond([
+        { name: 'No leagues found. Create one with /create_league', value: 'no_leagues' }
+      ]);
+      return;
+    }
+    
+    const filtered = leagues
+      .filter((league) => league.name.toLowerCase().includes(focusedValue))
+      .slice(0, 25) // Discord has a limit of 25 choices
+      .map((league) => ({ name: league.name, value: league.name }));
+    
+    if (filtered.length === 0) {
+      await interaction.respond([
+        { name: 'No matching leagues found', value: 'no_match' }
+      ]);
+      return;
+    }
+    
+    await interaction.respond(filtered);
+  } catch (error) {
+    console.error('Error in league autocomplete:', error);
+    await interaction.respond([
+      { name: 'Error loading leagues', value: 'error' }
+    ]);
+  }
 }
 
 // Helper function for match ID autocomplete

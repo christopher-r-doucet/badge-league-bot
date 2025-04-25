@@ -284,8 +284,8 @@ export class Database {
    * Get all leagues in a guild
    */
   static async getGuildLeagues(guildId?: string): Promise<any[]> {
-    await this.ensureInitialized();
     try {
+      await this.ensureInitialized();
       const leagueService = await this.getLeagueService();
       return leagueService.getGuildLeagues(guildId);
     } catch (error) {
@@ -293,11 +293,14 @@ export class Database {
       
       // Try to access the repository directly as a fallback
       try {
-        if (!this.dataSource.isInitialized) {
-          await this.dataSource.initialize();
+        console.log('Attempting direct repository access for League entity');
+        
+        // Ensure we have a connection
+        if (!this.dataSource || !this.dataSource.isInitialized) {
+          console.log('Database connection not initialized, attempting to initialize...');
+          this.dataSource = await DatabaseConnection.getConnection();
         }
         
-        console.log('Attempting direct repository access for League entity');
         const leagueRepository = this.dataSource.getRepository(League);
         const query = leagueRepository.createQueryBuilder('league');
         
@@ -310,7 +313,9 @@ export class Database {
         return leagues;
       } catch (fallbackError) {
         console.error('Fallback error getting leagues:', fallbackError);
-        throw error; // Throw the original error
+        // Return empty array instead of throwing to prevent command failures
+        console.log('Returning empty array as fallback');
+        return [];
       }
     }
   }
