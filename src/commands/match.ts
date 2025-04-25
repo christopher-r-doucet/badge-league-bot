@@ -80,6 +80,11 @@ const scheduleMatchCommand: Command = {
       option.setName('time')
         .setDescription('Time of the match (HH:MM) - not needed for instant matches')
         .setRequired(false)
+    )
+    .addBooleanOption(option =>
+      option.setName('random_decks')
+        .setDescription('Assign random color decks to both players')
+        .setRequired(false)
     ) as unknown as SlashCommandBuilder,
   deploymentType: 'global',
   
@@ -98,6 +103,7 @@ const scheduleMatchCommand: Command = {
       const leagueName = interaction.options.getString('league', true);
       const dateStr = interaction.options.getString('date');
       const timeStr = interaction.options.getString('time');
+      const useRandomDecks = interaction.options.getBoolean('random_decks') || false;
       const guildId = interaction.guildId;
       
       // Validate that we're in a guild
@@ -158,7 +164,8 @@ const scheduleMatchCommand: Command = {
             interaction.user.id,
             opponent.id,
             guildId,
-            matchDate
+            matchDate,
+            useRandomDecks
           );
           
           // Get the enriched match with player and league details
@@ -204,6 +211,15 @@ const scheduleMatchCommand: Command = {
             embed.addFields({ 
               name: 'Scheduled For', 
               value: 'Instant match (play now)', 
+              inline: false 
+            });
+          }
+          
+          // Add deck information if random decks were assigned
+          if (useRandomDecks && match.player1Deck && match.player2Deck) {
+            embed.addFields({ 
+              name: 'Assigned Decks', 
+              value: `<@${interaction.user.id}>: ${match.player1Deck}\n<@${opponent.id}>: ${match.player2Deck}`, 
               inline: false 
             });
           }
@@ -451,9 +467,16 @@ const viewMatchesCommand: Command = {
           
           const confirmationStatus = `${match.player1Confirmed ? '✅' : '❌'} vs ${match.player2Confirmed ? '✅' : '❌'}`;
           
+          let matchDetails = `**Players**: ${player1Name} vs ${player2Name}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**ID**: \`${match.id.substring(0, 8)}...\``;
+          
+          // Add deck information if available
+          if (match.player1Deck && match.player2Deck) {
+            matchDetails += `\n**Decks**: ${player1Name} (${match.player1Deck}) vs ${player2Name} (${match.player2Deck})`;
+          }
+          
           embed.addFields({
             name: `Match #${index + 1}`,
-            value: `**Players**: ${player1Name} vs ${player2Name}\n**Date**: ${dateInfo}\n**Confirmation**: ${confirmationStatus}\n**ID**: \`${match.id.substring(0, 8)}...\``,
+            value: matchDetails,
             inline: false
           });
         });

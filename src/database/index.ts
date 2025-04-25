@@ -132,18 +132,26 @@ export class Database {
   }
   
   /**
-   * Schedule a match
+   * Schedule a match between two players
+   * @param leagueName Name of the league
+   * @param player1Id Discord ID of player 1
+   * @param player2Id Discord ID of player 2
+   * @param guildId Discord guild ID
+   * @param scheduledDate Optional scheduled date for the match
+   * @param useRandomDecks Whether to assign random deck colors
+   * @returns The created match
    */
   static async scheduleMatch(
     leagueName: string, 
     player1Id: string, 
     player2Id: string, 
     guildId: string, 
-    scheduledDate?: Date
-  ): Promise<any> {
-    await this.ensureInitialized();
-    const matchService = await this.getMatchService();
-    return matchService.scheduleMatch(leagueName, player1Id, player2Id, guildId, scheduledDate);
+    scheduledDate?: Date,
+    useRandomDecks: boolean = false
+  ): Promise<Match> {
+    await Database.ensureInitialized();
+    const matchService = await Database.getMatchService();
+    return matchService.scheduleMatch(leagueName, player1Id, player2Id, guildId, scheduledDate, useRandomDecks);
   }
   
   /**

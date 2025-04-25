@@ -5,6 +5,7 @@ import { IMatchRepository, MatchRepository } from '../repositories/match-reposit
 import { IPlayerRepository, PlayerRepository } from '../repositories/player-repository.js';
 import { ILeagueRepository, LeagueRepository } from '../repositories/league-repository.js';
 import { MoreThanOrEqual, In } from 'typeorm';
+import { getRandomColorPair, DeckColor } from '../../utils/deck-colors.js';
 
 /**
  * Extended match interface with ELO change information
@@ -38,7 +39,7 @@ export interface IMatchService {
   /**
    * Schedule a match between two players
    */
-  scheduleMatch(leagueName: string, player1Id: string, player2Id: string, guildId: string, scheduledDate?: Date): Promise<Match>;
+  scheduleMatch(leagueName: string, player1Id: string, player2Id: string, guildId: string, scheduledDate?: Date, useRandomDecks?: boolean): Promise<Match>;
   
   /**
    * Confirm a match
@@ -106,7 +107,7 @@ export class MatchService implements IMatchService {
   /**
    * Schedule a match between two players
    */
-  async scheduleMatch(leagueName: string, player1Id: string, player2Id: string, guildId: string, scheduledDate?: Date): Promise<Match> {
+  async scheduleMatch(leagueName: string, player1Id: string, player2Id: string, guildId: string, scheduledDate?: Date, useRandomDecks: boolean = false): Promise<Match> {
     try {
       // Find the league
       const leagues = await this.leagueRepository.findByGuildId(guildId);
@@ -132,7 +133,29 @@ export class MatchService implements IMatchService {
         throw new Error(`Your opponent is not a member of the league "${leagueName}"`);
       }
 
-      // Create the match
+      // Check if there's already an active match between these players in this league
+      const existingMatches = await this.matchRepository.find({
+        where: [
+          { 
+            player1Id: player1.id, 
+            player2Id: player2.id, 
+            leagueId: league.id,
+            status: MatchStatus.SCHEDULED
+          },
+          { 
+            player1Id: player2.id, 
+            player2Id: player1.id, 
+            leagueId: league.id,
+            status: MatchStatus.SCHEDULED
+          }
+        ]
+      });
+
+      if (existingMatches.length > 0) {
+        throw new Error(`There is already an active match between you and this opponent in the league "${leagueName}"`);
+      }
+
+      // Create a new match
       const match = new Match();
       match.leagueId = league.id;
       match.player1Id = player1.id;
@@ -140,9 +163,17 @@ export class MatchService implements IMatchService {
       match.status = MatchStatus.SCHEDULED;
       match.scheduledDate = scheduledDate || null;
       match.isInstantMatch = !scheduledDate;
-      match.player1Confirmed = true;
-      match.player2Confirmed = !scheduledDate ? false : true;
+      match.player1Confirmed = true; // The player who schedules automatically confirms
+      match.player2Confirmed = false;
+      
+      // Assign random deck colors if requested
+      if (useRandomDecks) {
+        const [color1, color2] = getRandomColorPair();
+        match.player1Deck = color1;
+        match.player2Deck = color2;
+      }
 
+      // Save the match
       const savedMatch = await this.matchRepository.save(match);
       return savedMatch;
     } catch (error) {
