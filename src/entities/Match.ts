@@ -63,10 +63,10 @@ export class Match implements IMatch {
   @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'timestamptz' })
   scheduledDate: Date | null;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'timestamptz' })
   completedDate: Date;
 
   @Column({ default: false })
