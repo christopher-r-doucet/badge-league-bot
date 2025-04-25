@@ -94,7 +94,23 @@ export class MatchService implements IMatchService {
    * Get a match by ID with all details
    */
   async getMatch(matchId: string): Promise<any | null> {
-    return this.matchRepository.findByIdWithDetails(matchId);
+    try {
+      const match = await this.matchRepository.findByIdWithDetails(matchId);
+      
+      if (!match) {
+        return null;
+      }
+      
+      // Ensure deck colors are included in the returned data
+      return {
+        ...match,
+        player1Deck: match.player1Deck || null,
+        player2Deck: match.player2Deck || null
+      };
+    } catch (error) {
+      console.error('Error getting match:', error);
+      throw error;
+    }
   }
   
   /**

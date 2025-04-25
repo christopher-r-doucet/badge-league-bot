@@ -229,16 +229,25 @@ export class MatchRepository extends BaseRepository<Match> implements IMatchRepo
    */
   async findByIdWithDetails(matchId: string): Promise<any | null> {
     try {
-      const match = await this.findById(matchId);
+      // Find the match
+      const match = await this.repository.findOne({
+        where: { id: matchId }
+      });
       
-      if (!match) return null;
+      if (!match) {
+        return null;
+      }
       
-      // Get related entities
+      // Get league details
+      const league = await this.leagueRepository.findOne({
+        where: { id: match.leagueId }
+      });
+      
+      // Get player details
       const player1 = await this.playerRepository.findOne({ where: { id: match.player1Id } });
       const player2 = await this.playerRepository.findOne({ where: { id: match.player2Id } });
-      const league = await this.leagueRepository.findOne({ where: { id: match.leagueId } });
       
-      // Ensure we have valid player objects with discordId and username
+      // Enrich with player and league details
       const enrichedPlayer1 = player1 ? {
         ...player1,
         discordId: player1.discordId || 'unknown',
@@ -268,7 +277,10 @@ export class MatchRepository extends BaseRepository<Match> implements IMatchRepo
         player2: enrichedPlayer2,
         // Keep the IDs directly accessible for backward compatibility
         player1Id: match.player1Id,
-        player2Id: match.player2Id
+        player2Id: match.player2Id,
+        // Include deck colors if available
+        player1Deck: match.player1Deck,
+        player2Deck: match.player2Deck
       };
     } catch (error) {
       console.error('Error getting match with details:', error);

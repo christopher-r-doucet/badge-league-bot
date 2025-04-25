@@ -146,8 +146,90 @@ async function handleButtonInteraction(interaction: ButtonInteraction) {
     }
     
     if (customId.startsWith('match_confirm:')) {
-      const [_, matchId] = customId.split(':');
-      await handleMatchConfirm(interaction, matchId);
+      const matchId = customId.split(':')[1];
+      
+      try {
+        // Confirm the match
+        const match = await db.confirmMatch(matchId, interaction.user.id);
+        
+        // Get the enriched match with player and league details
+        const enrichedMatch = await db.getMatch(matchId);
+        
+        if (!enrichedMatch) {
+          return interaction.reply({ content: 'Failed to retrieve match details after confirmation.', ephemeral: true });
+        }
+        
+        // Create embed
+        const embed = new EmbedBuilder()
+          .setColor('#00ff00')
+          .setTitle('Match Confirmed')
+          .setDescription(`<@${interaction.user.id}> has confirmed the match.`);
+        
+        // Add match details
+        embed.addFields(
+          { name: 'Players', value: `<@${enrichedMatch.player1?.discordId}> vs <@${enrichedMatch.player2?.discordId}>`, inline: false },
+          { name: 'League', value: enrichedMatch.league?.name || 'Unknown League', inline: true },
+          { name: 'Status', value: enrichedMatch.player1Confirmed && enrichedMatch.player2Confirmed ? 'Ready to Play' : 'Waiting for Confirmation', inline: true }
+        );
+        
+        // Add date field if scheduled
+        if (enrichedMatch.scheduledDate) {
+          embed.addFields({ 
+            name: 'Scheduled For', 
+            value: formatDate(enrichedMatch.scheduledDate), 
+            inline: false 
+          });
+        } else {
+          embed.addFields({ 
+            name: 'Scheduled For', 
+            value: 'Instant match (play now)', 
+            inline: false 
+          });
+        }
+        
+        // Add deck information if available
+        if (enrichedMatch.player1Deck && enrichedMatch.player2Deck) {
+          embed.addFields({ 
+            name: 'Assigned Decks', 
+            value: `<@${enrichedMatch.player1?.discordId}>: ${enrichedMatch.player1Deck}\n<@${enrichedMatch.player2?.discordId}>: ${enrichedMatch.player2Deck}`, 
+            inline: false 
+          });
+        }
+        
+        // Add confirmation status
+        embed.addFields({ 
+          name: 'Confirmation Status', 
+          value: `<@${enrichedMatch.player1?.discordId}>: ${enrichedMatch.player1Confirmed ? '✅' : '❌'}\n<@${enrichedMatch.player2?.discordId}>: ${enrichedMatch.player2Confirmed ? '✅' : '❌'}`, 
+          inline: false 
+        });
+        
+        // If both players have confirmed, add report button
+        const components = [];
+        if (enrichedMatch.player1Confirmed && enrichedMatch.player2Confirmed) {
+          const reportButton = new ButtonBuilder()
+            .setCustomId(`match_report:${matchId}`)
+            .setLabel('Report Result')
+            .setStyle(ButtonStyle.Primary);
+          
+          const cancelButton = new ButtonBuilder()
+            .setCustomId(`match_cancel:${matchId}`)
+            .setLabel('Cancel Match')
+            .setStyle(ButtonStyle.Danger);
+          
+          const row = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(reportButton, cancelButton);
+          
+          components.push(row);
+        }
+        
+        await interaction.update({ 
+          embeds: [embed],
+          components: components
+        });
+      } catch (error: any) {
+        console.error('Error confirming match:', error);
+        await interaction.reply({ content: `Error confirming match: ${error.message}`, ephemeral: true });
+      }
       return;
     }
     
@@ -398,18 +480,18 @@ async function handleMatchAccept(interaction: ButtonInteraction, matchId: string
     // Get match details first to check if the user is the challenger
     const matchDetails = await db.getMatch(matchId);
     if (!matchDetails) {
-      return interaction.editReply('Match not found.');
+      return interaction.reply({ content: 'Match not found.', ephemeral: true });
     }
     
     // Check if the user trying to accept is the one who created the match
     // We need to compare Discord IDs, not database IDs
     if (matchDetails.player1.discordId === interaction.user.id) {
-      return interaction.editReply('You cannot accept your own match challenge. The other player must accept it.');
+      return interaction.reply({ content: 'You cannot accept your own match challenge. The other player must accept it.', ephemeral: true });
     }
     
     // Check if the match is already fully confirmed
     if (matchDetails.player1Confirmed && matchDetails.player2Confirmed) {
-      return interaction.editReply('This match has already been accepted and is ready to play!');
+      return interaction.reply({ content: 'This match has already been accepted and is ready to play!', ephemeral: true });
     }
     
     // Proceed with match confirmation
